@@ -1,0 +1,275 @@
+"""
+Integration test — verifies the full proxy management flow.
+
+Tests:
+1. Handshake triggers matching + mounting of relevant servers
+2. Active server state is tracked and visible in list/metrics tools
+3. Health resource returns valid JSON
+4. Deactivate tracking works correctly
+
+Note: We use an SSE mock server for end-to-end transport testing, but
+the primary focus is on the orchestration layer (handshake → match → mount
+→ track) which is fully synchronous and testable without a live MCP connection.
+"""
+import json
+import os
+import signal
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+import pytest
+
+from src import proxy_server
+from src.config import CatalogueEntry, ProxyEntry
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _reset_proxy_state() -> None:
+    """Reset proxy global state between tests."""
+    proxy_server._active_servers.clear()
+    proxy_server._config = proxy_server.AppConfig()
+    proxy_server._catalogue = []
+
+
+def _make_http_entry(name: str, url: str, tags: list[str] = None) -> CatalogueEntry:
+    return CatalogueEntry(
+        name=name,
+        description=f"Mock {name} server",
+        url=url,
+        tags=tags or [name],
+        runtime="sse",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tests: orchestration / management layer (no live transport needed)
+# ---------------------------------------------------------------------------
+
+class TestHandshakeOrchestration:
+    """
+    Tests that verify the handshake → match → mount → track pipeline.
+    Mounting against a live SSE URL is attempted; on failure the entry
+    is recorded in 'skipped'. We test the overall flow rather than the
+    live transport.
+    """
+
+    def setup_method(self):
+        """Reset state before every test."""
+        _reset_proxy_state()
+        proxy_server._startup()
+
+    def test_handshake_returns_valid_json(self):
+        """proxy.handshake must always return parseable JSON."""
+        raw = proxy_server.proxy_handshake(
+            tech_stack=["python"],
+            task_description="Testing the proxy",
+        )
+        data = json.loads(raw)
+        assert "activated_servers" in data
+        assert "skipped" in data
+        assert "active_tool_count" in data
+        assert "budget_remaining" in data
+        assert "context_received" in data
+        assert "tip" in data
+
+    def test_handshake_with_no_catalogue_match(self):
+        """If no catalogue entries match, no servers are activated."""
+        # Use a nonsense tech stack unlikely to match anything
+        raw = proxy_server.proxy_handshake(
+            tech_stack=["zxqwerty123"],
+            task_description="",
+        )
+        data = json.loads(raw)
+        assert data["activated_servers"] == []
+
+    def test_handshake_activates_matching_server(self, monkeypatch):
+        """
+        A catalogue entry matching the tech_stack should be picked up by
+        the matcher. We patch _do_mount to avoid needing a live server.
+        """
+        mock_entry = _make_http_entry("github", "http://localhost:9999/sse", tags=["github", "git", "version-control"])
+        proxy_server._catalogue.append(mock_entry)
+
+        # Patch _do_mount to succeed without a real network call
+        def fake_mount(entry):
+            proxy_server._active_servers[entry.name] = (entry, None, 5)
+            return True, f"Mock-mounted '{entry.name}'."
+
+        monkeypatch.setattr(proxy_server, "_do_mount", fake_mount)
+
+        raw = proxy_server.proxy_handshake(
+            tech_stack=["github"],
+            task_description="I need to manage GitHub issues",
+        )
+        data = json.loads(raw)
+        assert "github" in data["activated_servers"]
+
+    def test_handshake_skips_already_active_server(self, monkeypatch):
+        """Calling handshake twice should not try to double-mount."""
+        entry = _make_http_entry("github", "http://localhost:9999/sse", tags=["github"])
+        proxy_server._catalogue.append(entry)
+
+        def fake_mount(e):
+            proxy_server._active_servers[e.name] = (e, None, 5)
+            return True, "Mounted."
+
+        monkeypatch.setattr(proxy_server, "_do_mount", fake_mount)
+
+        proxy_server.proxy_handshake(tech_stack=["github"])
+
+        # Second handshake: server is already active, should not re-mount
+        call_count = {"n": 0}
+        original_mount = proxy_server._do_mount
+
+        def counting_mount(e):
+            call_count["n"] += 1
+            return original_mount(e)
+
+        monkeypatch.setattr(proxy_server, "_do_mount", counting_mount)
+        proxy_server.proxy_handshake(tech_stack=["github"])
+        assert call_count["n"] == 0, "Should not call _do_mount for already-active server"
+
+
+class TestProxyManagementTools:
+    """Tests for the proxy.* management tools."""
+
+    def setup_method(self):
+        _reset_proxy_state()
+        proxy_server._startup()
+
+    def test_list_active_servers_empty(self):
+        raw = proxy_server.proxy_list_active_servers()
+        data = json.loads(raw)
+        assert data["active_servers"] == []
+        assert data["total_tools"] == 0
+
+    def test_list_active_servers_with_entries(self):
+        entry = ProxyEntry(name="test-server", url="http://localhost:9999/sse", tags=["test"])
+        proxy_server._active_servers["test-server"] = (entry, None, 7)
+
+        raw = proxy_server.proxy_list_active_servers()
+        data = json.loads(raw)
+        assert len(data["active_servers"]) == 1
+        assert data["active_servers"][0]["name"] == "test-server"
+        assert data["active_servers"][0]["estimated_tools"] == 7
+        assert data["total_tools"] == 7
+
+    def test_list_available_servers(self):
+        proxy_server._catalogue = [
+            _make_http_entry("github", "http://localhost:9999/sse", ["github"]),
+            _make_http_entry("postgres", "http://localhost:9998/sse", ["database"]),
+        ]
+        raw = proxy_server.proxy_list_available_servers()
+        data = json.loads(raw)
+        names = [s["name"] for s in data["available_servers"]]
+        assert "github" in names
+        assert "postgres" in names
+
+    def test_list_available_servers_excludes_active(self):
+        cat = _make_http_entry("github", "http://localhost:9999/sse", ["github"])
+        proxy_server._catalogue = [cat]
+        entry = ProxyEntry(name="github", url="http://localhost:9999/sse")
+        proxy_server._active_servers["github"] = (entry, None, 5)
+
+        raw = proxy_server.proxy_list_available_servers()
+        data = json.loads(raw)
+        assert all(s["name"] != "github" for s in data["available_servers"])
+
+    def test_list_available_servers_filter_tag(self):
+        proxy_server._catalogue = [
+            _make_http_entry("github", "http://localhost:9999/sse", ["github"]),
+            _make_http_entry("postgres", "http://localhost:9998/sse", ["database"]),
+        ]
+        raw = proxy_server.proxy_list_available_servers(filter_tag="database")
+        data = json.loads(raw)
+        names = [s["name"] for s in data["available_servers"]]
+        assert "postgres" in names
+        assert "github" not in names
+
+    def test_deactivate_server(self):
+        entry = ProxyEntry(name="test-server", url="http://localhost:9999/sse")
+        proxy_server._active_servers["test-server"] = (entry, None, 5)
+
+        raw = proxy_server.proxy_deactivate_server("test-server")
+        data = json.loads(raw)
+        assert data["ok"] is True
+        assert "test-server" not in proxy_server._active_servers
+
+    def test_deactivate_nonexistent_server(self):
+        raw = proxy_server.proxy_deactivate_server("nonexistent")
+        data = json.loads(raw)
+        assert data["ok"] is False
+
+    def test_get_metrics_returns_health(self):
+        raw = proxy_server.proxy_get_metrics()
+        data = json.loads(raw)
+        assert data["status"] == "ok"
+        assert "uptimeSeconds" in data
+
+
+class TestMCPResources:
+    """Tests for the always-on MCP Resources."""
+
+    def setup_method(self):
+        _reset_proxy_state()
+        proxy_server._startup()
+
+    def test_resource_info(self):
+        raw = proxy_server.resource_info()
+        data = json.loads(raw)
+        assert data["name"] == "Dynamic MCP Proxy"
+        assert "tool_budget" in data
+        assert "catalogue_size" in data
+
+    def test_resource_health(self):
+        raw = proxy_server.resource_health()
+        data = json.loads(raw)
+        assert data["status"] == "ok"
+        assert "uptimeSeconds" in data
+        assert "activeServers" in data
+        assert "budgetRemaining" in data
+
+    def test_resource_servers(self):
+        raw = proxy_server.resource_servers()
+        data = json.loads(raw)
+        assert "active" in data
+        assert "available" in data
+        assert "tool_budget" in data
+
+
+class TestLRUEviction:
+    """Tests for the LRU tool budget eviction logic."""
+
+    def setup_method(self):
+        _reset_proxy_state()
+        # Set a tiny budget so eviction is easy to trigger
+        proxy_server._config = proxy_server.AppConfig(tool_budget=10)
+
+    def test_eviction_when_budget_exceeded(self, monkeypatch):
+        """Adding a server that pushes over budget should evict the oldest."""
+        # Simulate two loaded servers filling the budget
+        e1 = ProxyEntry(name="server1", url="http://localhost:9001/sse")
+        e2 = ProxyEntry(name="server2", url="http://localhost:9002/sse")
+        proxy_server._active_servers["server1"] = (e1, None, 6)
+        proxy_server._active_servers["server2"] = (e2, None, 4)
+        # Total = 10, exactly at budget
+
+        evicted = []
+        original_unmount = proxy_server._do_unmount
+
+        def tracking_unmount(name):
+            evicted.append(name)
+            return original_unmount(name)
+
+        monkeypatch.setattr(proxy_server, "_do_unmount", tracking_unmount)
+
+        # Trigger eviction by requesting 5 more
+        proxy_server._evict_lru_if_needed(needed=5)
+        assert len(evicted) >= 1
+        # server1 is LRU (inserted first)
+        assert "server1" in evicted

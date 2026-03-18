@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from fastmcp import FastMCP
-from fastmcp.server.proxy import FastMCPProxy
+from fastmcp.server.server import create_proxy
 
 from .auth import authenticate, AuthError
 from .config import (
@@ -67,8 +67,8 @@ _config: AppConfig = AppConfig()
 _catalogue: list[CatalogueEntry] = []
 
 # OrderedDict preserves insertion order and lets us do LRU eviction
-# key = server name, value = (ProxyEntry, FastMCPProxy instance, tool_count)
-_active_servers: OrderedDict[str, tuple[ProxyEntry, FastMCPProxy, int]] = OrderedDict()
+# key = server name, value = (ProxyEntry, FastMCP (proxy), tool_count)
+_active_servers: OrderedDict[str, tuple[ProxyEntry, Any, int]] = OrderedDict()
 _lock = threading.Lock()
 
 # FastMCP main server
@@ -131,8 +131,8 @@ def _do_mount(entry: ProxyEntry) -> tuple[bool, str]:
     _evict_lru_if_needed(needed=estimated)
 
     try:
-        proxy = FastMCPProxy.from_url(entry.url)
-        mcp.mount(proxy, prefix=entry.name)
+        proxy = create_proxy(entry.url)
+        mcp.mount(proxy, namespace=entry.name)
 
         with _lock:
             _active_servers[entry.name] = (entry, proxy, estimated)
@@ -149,14 +149,13 @@ def _do_unmount(name: str) -> tuple[bool, str]:
     with _lock:
         if name not in _active_servers:
             return False, f"'{name}' is not mounted."
-        entry, proxy, _ = _active_servers.pop(name)
+        _active_servers.pop(name)
 
-    try:
-        mcp.unmount(name)
-    except Exception:
-        pass  # FastMCP may not support unmount in all versions; best-effort
-
-    return True, f"Unmounted '{name}'."
+    # FastMCP does not expose an unmount() API in the current version;
+    # we track deactivation in _active_servers and the server will stop
+    # being treated as active. Tools previously mounted remain until
+    # the proxy process restarts — best-effort for now.
+    return True, f"Deregistered '{name}' from active tracking (takes full effect on restart)."
 
 
 def _resolve_catalogue_entry(name: str) -> Optional[CatalogueEntry]:
@@ -183,16 +182,17 @@ def _catalogue_entry_to_proxy(cat: CatalogueEntry) -> Optional[ProxyEntry]:
 
 
 def _uptime_seconds() -> float:
-    return round(time.monotonic() - _start_time, 2)
+    return float(round(time.monotonic() - _start_time, 2))
 
 
 def _memory_mb() -> float:
     try:
         import resource
         usage = resource.getrusage(resource.RUSAGE_SELF)
-        return round(usage.ru_maxrss / 1024, 2)
+        return float(round(usage.ru_maxrss / 1024, 2))
     except Exception:
         return 0.0
+
 
 
 # ---------------------------------------------------------------------------
@@ -305,9 +305,10 @@ def suggest_tools_for_context() -> str:
 def proxy_handshake(
     tech_stack: list[str],
     task_description: str = "",
-    open_files: list[str] = None,
-    requirements: list[str] = None,
+    open_files: Optional[list[str]] = None,
+    requirements: Optional[list[str]] = None,
 ) -> str:
+
     """
     Send your project context to the proxy. It will activate the most relevant
     MCP servers from the catalogue and return a summary of available tools.
@@ -344,7 +345,8 @@ def proxy_handshake(
         else:
             skipped.append(f"{r.entry.name}: {msg}")
 
-    latency = round((time.monotonic() - t0) * 1000, 1)
+    latency = float(round((time.monotonic() - t0) * 1000, 1))
+
     audit(tool="proxy.handshake", outcome="ok", latency_ms=latency,
           extra={"activated": activated})
 
@@ -357,6 +359,7 @@ def proxy_handshake(
             "tech_stack": tech_stack,
             "task_description": task_description[:120] if task_description else "",
         },
+
         "tip": (
             "Use proxy.list_available_servers() to browse more, "
             "or proxy.activate_server(name) to load specific ones."
@@ -433,8 +436,9 @@ def proxy_activate_server(name: str) -> str:
 
     ok, msg = _do_mount(entry)
     audit(tool="proxy.activate_server", outcome="ok" if ok else "error",
-          latency_ms=round((time.monotonic() - t0) * 1000, 1),
+          latency_ms=float(round((time.monotonic() - t0) * 1000, 1)),
           extra={"server": name})
+
     return json.dumps({"ok": ok, "message": msg, "active_tool_count": _tool_count()})
 
 
@@ -449,8 +453,9 @@ def proxy_deactivate_server(name: str) -> str:
     t0 = time.monotonic()
     ok, msg = _do_unmount(name)
     audit(tool="proxy.deactivate_server", outcome="ok" if ok else "error",
-          latency_ms=round((time.monotonic() - t0) * 1000, 1),
+          latency_ms=float(round((time.monotonic() - t0) * 1000, 1)),
           extra={"server": name})
+
     return json.dumps({"ok": ok, "message": msg, "active_tool_count": _tool_count()})
 
 
@@ -458,10 +463,11 @@ def proxy_deactivate_server(name: str) -> str:
 def proxy_add_custom_proxy(
     name: str,
     url: str,
-    tags: list[str] = None,
+    tags: Optional[list[str]] = None,
     runtime: str = "sse",
     activate_now: bool = True,
 ) -> str:
+
     """
     Register a custom (non-catalogue) MCP server and optionally activate it.
 
