@@ -1,0 +1,21 @@
+{
+  "tool_budget": 50,
+  "auth_enabled": false,
+  "guardrails_enabled": true,
+  "rate_limit_rpm": 120,
+  "catalogue_path": "catalogue.json",
+  "audit_log_path": "audit.log",
+  "jwt_public_key_path": "path/to/public_key.pem",
+  "hmac_api_key": "your-secret-hmac-key-here",
+  "tool_allowlist": [],
+  "tool_denylist": [],
+  "proxies": [
+    {
+      "name": "example-sse-server",
+      "url": "http://localhost:8100/sse",
+      "tags": ["example", "demo"],
+      "active": false,
+      "runtime": "sse"
+    }
+  ]
+}
