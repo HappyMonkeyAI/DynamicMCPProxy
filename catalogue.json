@@ -21,7 +21,7 @@
     "name": "filesystem",
     "description": "Local filesystem access — read, write, list files and directories",
     "command": "npx -y @modelcontextprotocol/server-filesystem",
-    "tags": ["filesystem", "files", "directories", "local", "io"],
+    "tags": ["filesystem", "files", "directories", "local", "io", "read", "write"],
     "tech_stack": ["any"],
     "runtime": "stdio",
     "env_vars": []
@@ -64,9 +64,9 @@
   },
   {
     "name": "fetch",
-    "description": "HTTP fetch — retrieve content from URLs, web scraping",
+    "description": "HTTP fetch — retrieve and convert web content to markdown, web scraping",
     "command": "uvx mcp-server-fetch",
-    "tags": ["http", "fetch", "web", "scraping", "rest", "api"],
+    "tags": ["http", "fetch", "web", "scraping", "rest", "api", "markdown", "html"],
     "tech_stack": ["any"],
     "runtime": "stdio",
     "env_vars": []
@@ -147,7 +147,7 @@
     "name": "sequential-thinking",
     "description": "Sequential thinking — structured multi-step reasoning for complex problems",
     "command": "npx -y @modelcontextprotocol/server-sequential-thinking",
-    "tags": ["reasoning", "thinking", "planning", "chain_of_thought", "analysis"],
+    "tags": ["reasoning", "thinking", "planning", "chain_of_thought", "analysis", "problem_solving"],
     "tech_stack": ["any"],
     "runtime": "stdio",
     "env_vars": []
@@ -241,5 +241,167 @@
     "tech_stack": ["any"],
     "runtime": "stdio",
     "env_vars": ["PERPLEXITY_API_KEY"]
+  },
+  {
+    "name": "git",
+    "description": "Git MCP server — read, search, diff, log, blame local git repositories without needing GitHub/GitLab tokens",
+    "command": "uvx mcp-server-git",
+    "tags": ["git", "version_control", "diff", "log", "blame", "commits", "local", "code"],
+    "tech_stack": ["any"],
+    "runtime": "stdio",
+    "env_vars": []
+  },
+  {
+    "name": "time",
+    "description": "Time and timezone tools — current time, timezone conversion, date arithmetic",
+    "command": "uvx mcp-server-time",
+    "tags": ["time", "timezone", "date", "clock", "scheduling", "conversion"],
+    "tech_stack": ["any"],
+    "runtime": "stdio",
+    "env_vars": []
+  },
+  {
+    "name": "everything",
+    "description": "Reference MCP server — demos all MCP features: tools, resources, prompts, sampling",
+    "command": "npx -y @modelcontextprotocol/server-everything",
+    "tags": ["reference", "testing", "demo", "mcp", "development", "debugging"],
+    "tech_stack": ["any"],
+    "runtime": "stdio",
+    "env_vars": []
+  },
+  {
+    "name": "wikipedia",
+    "description": "Wikipedia MCP server — search and retrieve Wikipedia articles, free public API",
+    "command": "uvx mcp-server-wikipedia",
+    "tags": ["wikipedia", "research", "knowledge", "encyclopedia", "facts", "reference"],
+    "tech_stack": ["any"],
+    "runtime": "stdio",
+    "env_vars": []
+  },
+  {
+    "name": "arxiv",
+    "description": "arXiv MCP server — search and retrieve academic papers from arXiv, free public API",
+    "command": "uvx arxiv-mcp-server",
+    "tags": ["arxiv", "research", "papers", "academic", "science", "ml", "ai", "physics"],
+    "tech_stack": ["any"],
+    "runtime": "stdio",
+    "env_vars": []
+  },
+  {
+    "name": "open-meteo-weather",
+    "description": "Open-Meteo weather — free weather forecasts and historical data, no API key required",
+    "command": "uvx mcp-server-openmeteo",
+    "tags": ["weather", "forecast", "temperature", "climate", "location", "free"],
+    "tech_stack": ["any"],
+    "runtime": "stdio",
+    "env_vars": []
+  },
+  {
+    "name": "searxng",
+    "description": "SearXNG web search — privacy-respecting meta-search engine, self-hosted or public instances",
+    "command": "uvx mcp-server-searxng",
+    "tags": ["search", "web", "privacy", "meta_search", "research", "news"],
+    "tech_stack": ["any"],
+    "runtime": "stdio",
+    "env_vars": []
+  },
+  {
+    "name": "obsidian",
+    "description": "Obsidian vault MCP server — read, search, write notes in a local Obsidian vault",
+    "command": "npx -y mcp-obsidian",
+    "tags": ["obsidian", "notes", "markdown", "knowledge_base", "zettelkasten", "writing", "local"],
+    "tech_stack": ["any"],
+    "runtime": "stdio",
+    "env_vars": []
+  },
+  {
+    "name": "pandoc",
+    "description": "Pandoc document conversion — convert between Markdown, HTML, PDF, DOCX and more",
+    "command": "uvx mcp-pandoc",
+    "tags": ["pandoc", "documents", "conversion", "markdown", "pdf", "docx", "html", "writing"],
+    "tech_stack": ["any"],
+    "runtime": "stdio",
+    "env_vars": []
+  },
+  {
+    "name": "everything-search",
+    "description": "Fast local file search — cross-platform file system search (Windows/macOS/Linux)",
+    "command": "uvx mcp-everything-search",
+    "tags": ["search", "files", "filesystem", "local", "find", "index"],
+    "tech_stack": ["any"],
+    "runtime": "stdio",
+    "env_vars": []
+  },
+  {
+    "name": "playwright",
+    "description": "Playwright browser automation — navigate pages, capture screenshots, scrape content, run E2E tests",
+    "command": "npx -y @playwright/mcp",
+    "tags": ["playwright", "browser", "automation", "testing", "e2e", "screenshot", "scraping"],
+    "tech_stack": ["javascript", "typescript", "node", "python"],
+    "runtime": "stdio",
+    "env_vars": []
+  },
+  {
+    "name": "mcp-local-rag",
+    "description": "Local RAG search — semantic search over local documents using DuckDuckGo and local embeddings, no external API needed",
+    "command": "uvx mcp-local-rag",
+    "tags": ["rag", "search", "embeddings", "local", "documents", "semantic_search", "offline"],
+    "tech_stack": ["any"],
+    "runtime": "stdio",
+    "env_vars": []
+  },
+  {
+    "name": "markdownify",
+    "description": "Markdownify — convert PPTX, HTML, PDF, YouTube transcripts and more to clean Markdown",
+    "command": "uvx markdownify-mcp",
+    "tags": ["markdown", "conversion", "pdf", "pptx", "html", "youtube", "documents", "writing"],
+    "tech_stack": ["any"],
+    "runtime": "stdio",
+    "env_vars": []
+  },
+  {
+    "name": "pubmed",
+    "description": "PubMed MCP server — search and access biomedical research articles from PubMed, free public API",
+    "command": "uvx mcp-server-pubmed",
+    "tags": ["pubmed", "research", "biomedical", "papers", "academic", "health", "science"],
+    "tech_stack": ["any"],
+    "runtime": "stdio",
+    "env_vars": []
+  },
+  {
+    "name": "quickchart",
+    "description": "QuickChart — generate charts and graphs from data using QuickChart.io, free tier available",
+    "command": "uvx mcp-quickchart",
+    "tags": ["charts", "graphs", "visualization", "data", "reporting", "png", "svg"],
+    "tech_stack": ["any"],
+    "runtime": "stdio",
+    "env_vars": []
+  },
+  {
+    "name": "vega-lite",
+    "description": "Vega-Lite visualizations — generate data visualizations from fetched data using Vega-Lite",
+    "command": "npx -y @modelcontextprotocol/server-vega-lite",
+    "tags": ["visualization", "charts", "graphs", "data", "vega", "analytics", "reporting"],
+    "tech_stack": ["any"],
+    "runtime": "stdio",
+    "env_vars": []
+  },
+  {
+    "name": "mcp-grep",
+    "description": "Grep MCP server — regex pattern search across files and directories",
+    "command": "uvx mcp-grep",
+    "tags": ["grep", "search", "regex", "files", "code", "text", "find"],
+    "tech_stack": ["any"],
+    "runtime": "stdio",
+    "env_vars": []
+  },
+  {
+    "name": "desktop-commander",
+    "description": "DesktopCommander — file management, terminal commands, SSH connections on local machine",
+    "command": "npx -y @wonderwhy-er/desktop-commander",
+    "tags": ["terminal", "shell", "commands", "files", "ssh", "local", "automation", "devops"],
+    "tech_stack": ["any"],
+    "runtime": "stdio",
+    "env_vars": []
   }
 ]

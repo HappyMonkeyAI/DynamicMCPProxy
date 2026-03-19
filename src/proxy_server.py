@@ -578,7 +578,7 @@ def main() -> None:
     if os.environ.get("DISABLE_HTTP_SIDECAR", "").lower() not in ("1", "true", "yes"):
         _start_http_sidecar(http_port)
 
-    mcp.run()
+    mcp.run(show_banner=False)
 
 
 if __name__ == "__main__":
