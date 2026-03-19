@@ -34,6 +34,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+import logging
+logging.basicConfig(stream=sys.stderr)
+
 from fastmcp import FastMCP
 from fastmcp.server.server import create_proxy
 
@@ -301,7 +304,7 @@ def suggest_tools_for_context() -> str:
 # proxy.* tools (always exposed — the minimal management surface)
 # ---------------------------------------------------------------------------
 
-@mcp.tool(name="proxy.handshake")
+@mcp.tool(name="proxy_handshake")
 def proxy_handshake(
     tech_stack: list[str],
     task_description: str = "",
@@ -347,7 +350,7 @@ def proxy_handshake(
 
     latency = float(round((time.monotonic() - t0) * 1000, 1))
 
-    audit(tool="proxy.handshake", outcome="ok", latency_ms=latency,
+    audit(tool="proxy_handshake", outcome="ok", latency_ms=latency,
           extra={"activated": activated})
 
     result = {
@@ -361,14 +364,14 @@ def proxy_handshake(
         },
 
         "tip": (
-            "Use proxy.list_available_servers() to browse more, "
-            "or proxy.activate_server(name) to load specific ones."
+            "Use proxy_list_available_servers() to browse more, "
+            "or proxy_activate_server(name) to load specific ones."
         ),
     }
     return json.dumps(result, indent=2)
 
 
-@mcp.tool(name="proxy.list_active_servers")
+@mcp.tool(name="proxy_list_active_servers")
 def proxy_list_active_servers() -> str:
     """List all currently mounted MCP servers and their estimated tool counts."""
     if not _active_servers:
@@ -387,7 +390,7 @@ def proxy_list_active_servers() -> str:
     }, indent=2)
 
 
-@mcp.tool(name="proxy.list_available_servers")
+@mcp.tool(name="proxy_list_available_servers")
 def proxy_list_available_servers(filter_tag: str = "") -> str:
     """
     List MCP servers in the catalogue that are not yet mounted.
@@ -416,7 +419,7 @@ def proxy_list_available_servers(filter_tag: str = "") -> str:
     }, indent=2)
 
 
-@mcp.tool(name="proxy.activate_server")
+@mcp.tool(name="proxy_activate_server")
 def proxy_activate_server(name: str) -> str:
     """
     Activate (mount) a server from the catalogue by name.
@@ -435,14 +438,14 @@ def proxy_activate_server(name: str) -> str:
         entry = _catalogue_entry_to_proxy(cat)
 
     ok, msg = _do_mount(entry)
-    audit(tool="proxy.activate_server", outcome="ok" if ok else "error",
+    audit(tool="proxy_activate_server", outcome="ok" if ok else "error",
           latency_ms=float(round((time.monotonic() - t0) * 1000, 1)),
           extra={"server": name})
 
     return json.dumps({"ok": ok, "message": msg, "active_tool_count": _tool_count()})
 
 
-@mcp.tool(name="proxy.deactivate_server")
+@mcp.tool(name="proxy_deactivate_server")
 def proxy_deactivate_server(name: str) -> str:
     """
     Deactivate (unmount) a currently loaded server to free up tool budget.
@@ -452,14 +455,14 @@ def proxy_deactivate_server(name: str) -> str:
     """
     t0 = time.monotonic()
     ok, msg = _do_unmount(name)
-    audit(tool="proxy.deactivate_server", outcome="ok" if ok else "error",
+    audit(tool="proxy_deactivate_server", outcome="ok" if ok else "error",
           latency_ms=float(round((time.monotonic() - t0) * 1000, 1)),
           extra={"server": name})
 
     return json.dumps({"ok": ok, "message": msg, "active_tool_count": _tool_count()})
 
 
-@mcp.tool(name="proxy.add_custom_proxy")
+@mcp.tool(name="proxy_add_custom_proxy")
 def proxy_add_custom_proxy(
     name: str,
     url: str,
@@ -490,7 +493,7 @@ def proxy_add_custom_proxy(
     return json.dumps({"ok": True, "message": f"Registered '{name}' (not yet activated).", "persisted": True})
 
 
-@mcp.tool(name="proxy.get_metrics")
+@mcp.tool(name="proxy_get_metrics")
 def proxy_get_metrics() -> str:
     """
     Return live process metrics for the proxy itself.
@@ -578,7 +581,7 @@ def main() -> None:
     if os.environ.get("DISABLE_HTTP_SIDECAR", "").lower() not in ("1", "true", "yes"):
         _start_http_sidecar(http_port)
 
-    mcp.run(show_banner=False)
+    mcp.run(show_banner=False, log_level="WARNING")
 
 
 if __name__ == "__main__":
