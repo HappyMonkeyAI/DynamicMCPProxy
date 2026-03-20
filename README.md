@@ -6,28 +6,9 @@ A smart MCP proxy server that **lazily loads relevant MCP tool servers based on 
 
 ### Prerequisites
 
-The proxy dynamically activates MCP servers from the catalogue, which use these runtime tools:
+The proxy dynamically activates MCP servers from the catalogue, which use `npx` (Node.js) and `uvx` (uv) to run. These need to be on the `PATH` that your IDE uses when spawning the proxy process.
 
-- **Node.js + npx** — for `npx`-based servers (GitHub, GitLab, Puppeteer, Slack, etc.)
-- **Python + uv** — for `uvx`-based servers (fetch, git, time, Wikipedia, arXiv, etc.)
-
-Install them:
-
-```bash
-# Node.js (includes npx)
-# Ubuntu/Debian:
-sudo apt install nodejs npm
-
-# macOS:
-brew install node
-
-# Python + uv
-# Ubuntu/Debian/macOS:
-curl -LsSf https://astral.sh/uv/install.sh | sh
-# or: pip install uv
-```
-
-Without these, the proxy will start but fail to mount catalogue servers with errors like `command not found: npx` or `command not found: uvx`.
+The easiest way to ensure this is to add a `PATH` env var to your MCP config entry (see below). Find your actual paths with `which npx` and `which uvx`.
 
 ### Install
 
@@ -45,14 +26,20 @@ uv sync
       "command": "uv",
       "args": [
         "run",
+        "--quiet",
         "--project",
-        "/home/stephen/dynamic-mcp-proxy-server",
+        "/home/user/dynamic-mcp-proxy-server",
         "python", "-m", "src.proxy_server"
-      ]
+      ],
+      "env": {
+        "PATH": "/home/user/.nvm/versions/node/v20.18.1/bin:/home/user/.local/bin:/usr/local/bin:/usr/bin:/bin"
+      }
     }
   }
 }
 ```
+
+Adjust the `PATH` value to match your system (`which npx` and `which uvx` will give you the right directories).
 
 Once published to PyPI, it simplifies to:
 ```json
@@ -167,7 +154,7 @@ curl -X POST http://localhost:8765/handshake \
   -d '{"tech_stack": ["python", "fastapi"], "task_description": "Building a REST API"}'
 ```
 
-This pre-warms the proxy before the MCP connection opens. Disable with `DISABLE_HTTP_SIDECAR=1`.
+This pre-warms the proxy before the MCP connection opens. Enable with `ENABLE_HTTP_SIDECAR=1`.
 
 ## Inspiration
 

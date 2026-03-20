@@ -37,7 +37,7 @@ from typing import Any, Optional
 import logging
 logging.basicConfig(stream=sys.stderr)
 
-from fastmcp import FastMCP
+from fastmcp import FastMCP, Client
 from fastmcp.server.server import create_proxy
 
 from .auth import authenticate, AuthError
@@ -106,7 +106,7 @@ def _evict_lru_if_needed(needed: int = 0) -> None:
                 break
             name, (entry, proxy, _) = next(iter(_active_servers.items()))
         _do_unmount(name)
-        print(f"[proxy] LRU evicted: {name}")
+        sys.stderr.write(f"[proxy] LRU evicted: {name}\n")
 
 
 def _estimate_tool_count(entry: ProxyEntry) -> int:
@@ -134,12 +134,13 @@ def _do_mount(entry: ProxyEntry) -> tuple[bool, str]:
     _evict_lru_if_needed(needed=estimated)
 
     try:
-        proxy = create_proxy(entry.url)
+        mcp_config = _mcp_config_for_entry(entry)
+        client = Client(mcp_config)
+        proxy = create_proxy(client)
         mcp.mount(proxy, namespace=entry.name)
 
         with _lock:
             _active_servers[entry.name] = (entry, proxy, estimated)
-            # Move to end = most recently used
             _active_servers.move_to_end(entry.name)
 
         return True, f"Mounted '{entry.name}' ({estimated} tools estimated)."
@@ -172,16 +173,24 @@ def _catalogue_entry_to_proxy(cat: CatalogueEntry) -> Optional[ProxyEntry]:
     """Convert a CatalogueEntry to a ProxyEntry for mounting."""
     if cat.url:
         return ProxyEntry(name=cat.name, url=cat.url, tags=cat.tags, runtime=cat.runtime)
-    # stdio servers: we can't mount them directly via FastMCPProxy without
-    # spinning up the subprocess. We store the command for documentation
-    # and return a ProxyEntry with a placeholder url for now.
-    # TODO: wire up stdio subprocess transport for full support
-    return ProxyEntry(
-        name=cat.name,
-        url=f"stdio://{cat.command}",
-        tags=cat.tags,
-        runtime="stdio",
-    )
+    if cat.command:
+        return ProxyEntry(
+            name=cat.name,
+            url=f"stdio://{cat.command}",
+            tags=cat.tags,
+            runtime="stdio",
+        )
+    return None
+
+
+def _mcp_config_for_entry(entry: ProxyEntry) -> dict:
+    """Build an MCPConfig dict for a ProxyEntry."""
+    if entry.runtime in ("sse", "http"):
+        return {"mcpServers": {entry.name: {"url": entry.url, "transport": entry.runtime}}}
+    # stdio — strip the "stdio://" prefix and split into command + args
+    command_str = entry.url.removeprefix("stdio://")
+    parts = command_str.split()
+    return {"mcpServers": {entry.name: {"command": parts[0], "args": parts[1:]}}}
 
 
 def _uptime_seconds() -> float:
@@ -509,7 +518,7 @@ def proxy_get_metrics() -> str:
 def _on_plugin_register(name: str, command: str) -> None:
     entry = ProxyEntry(name=name, url=f"stdio://{command}", tags=[], runtime="stdio")
     ok, msg = _do_mount(entry)
-    print(f"[plugin_scanner] {msg}")
+    sys.stderr.write(f"[plugin_scanner] {msg}\n")
 
 
 def _on_plugin_deregister(name: str) -> None:
@@ -526,21 +535,21 @@ def _startup() -> None:
     init_audit_log(_config)
     init_rate_limiter(_config)
 
-    print(f"[proxy] Loaded catalogue: {len(_catalogue)} servers.")
-    print(f"[proxy] Tool budget: {_config.tool_budget}.")
+    sys.stderr.write(f"[proxy] Loaded catalogue: {len(_catalogue)} servers.\n")
+    sys.stderr.write(f"[proxy] Tool budget: {_config.tool_budget}.\n")
 
     # Mount persisted active proxies
     for entry in _config.proxies:
         if entry.active:
             ok, msg = _do_mount(entry)
-            print(f"[proxy] Startup mount — {msg}")
+            sys.stderr.write(f"[proxy] Startup mount — {msg}\n")
 
     # Hot-plug scanner
     plugins_dir = Path(__file__).parent.parent / "plugins"
     scanner = PluginScanner(plugins_dir, _on_plugin_register, _on_plugin_deregister)
     scanner.start()
 
-    print(f"[proxy] Ready. Active tools: {_tool_count()} / {_config.tool_budget}.")
+    sys.stderr.write(f"[proxy] Ready. Active tools: {_tool_count()} / {_config.tool_budget}.\n")
 
 
 # ---------------------------------------------------------------------------
@@ -552,6 +561,17 @@ def _start_http_sidecar(port: int = 8765) -> None:
     try:
         from .api import create_app
         import uvicorn
+        import logging as _logging
+
+        # Ensure uvicorn never writes to stdout
+        for _name in ("uvicorn", "uvicorn.access", "uvicorn.error"):
+            _log = _logging.getLogger(_name)
+            if not _log.handlers:
+                _h = _logging.StreamHandler(sys.stderr)
+                _log.addHandler(_h)
+            else:
+                for _h in _log.handlers:
+                    _h.stream = sys.stderr
 
         app = create_app(
             config=_config,
@@ -559,14 +579,19 @@ def _start_http_sidecar(port: int = 8765) -> None:
             handshake_fn=proxy_handshake,
         )
 
+        cfg = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="warning",
+                             access_log=False)
+        server = uvicorn.Server(cfg)
+
         def _run():
-            uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
+            import asyncio
+            asyncio.run(server.serve())
 
         t = threading.Thread(target=_run, daemon=True, name="http-sidecar")
         t.start()
-        print(f"[proxy] HTTP sidecar started on http://0.0.0.0:{port}/handshake")
+        sys.stderr.write(f"[proxy] HTTP sidecar started on http://0.0.0.0:{port}/handshake\n")
     except Exception as exc:
-        print(f"[proxy] HTTP sidecar failed to start: {exc}")
+        sys.stderr.write(f"[proxy] HTTP sidecar failed to start: {exc}\n")
 
 
 # ---------------------------------------------------------------------------
@@ -576,9 +601,9 @@ def _start_http_sidecar(port: int = 8765) -> None:
 def main() -> None:
     _startup()
 
-    # Start HTTP sidecar if enabled (optional, non-MCP)
-    http_port = int(os.environ.get("HTTP_PORT", "8765"))
-    if os.environ.get("DISABLE_HTTP_SIDECAR", "").lower() not in ("1", "true", "yes"):
+    # Start HTTP sidecar only if explicitly enabled
+    if os.environ.get("ENABLE_HTTP_SIDECAR", "").lower() in ("1", "true", "yes"):
+        http_port = int(os.environ.get("HTTP_PORT", "8765"))
         _start_http_sidecar(http_port)
 
     mcp.run(show_banner=False, log_level="WARNING")
