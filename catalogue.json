@@ -177,7 +177,8 @@
     "tags": ["jira", "confluence", "atlassian", "project_management", "wiki", "issues", "tickets"],
     "tech_stack": ["any"],
     "runtime": "stdio",
-    "env_vars": ["JIRA_URL", "JIRA_USERNAME", "JIRA_API_TOKEN", "CONFLUENCE_URL"]
+    "env_vars": ["JIRA_URL", "JIRA_USERNAME", "JIRA_API_TOKEN", "CONFLUENCE_URL"],
+    "estimated_tools": 72
   },
   {
     "name": "hubspot",
@@ -186,7 +187,8 @@
     "tags": ["hubspot", "crm", "contacts", "deals", "sales", "marketing"],
     "tech_stack": ["any"],
     "runtime": "stdio",
-    "env_vars": ["HUBSPOT_ACCESS_TOKEN"]
+    "env_vars": ["HUBSPOT_ACCESS_TOKEN"],
+    "estimated_tools": 30
   },
   {
     "name": "zendesk",
@@ -195,7 +197,8 @@
     "tags": ["zendesk", "support", "tickets", "helpdesk", "customer_service"],
     "tech_stack": ["any"],
     "runtime": "stdio",
-    "env_vars": ["ZENDESK_SUBDOMAIN", "ZENDESK_EMAIL", "ZENDESK_API_TOKEN"]
+    "env_vars": ["ZENDESK_SUBDOMAIN", "ZENDESK_EMAIL", "ZENDESK_API_TOKEN"],
+    "estimated_tools": 25
   },
   {
     "name": "stripe",

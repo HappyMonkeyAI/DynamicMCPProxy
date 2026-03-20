@@ -10,13 +10,17 @@ resources/read and tools/list.
 """
 from __future__ import annotations
 
+import sys
 from typing import Any, Callable, Optional
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, HTTPException, Request, Security
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
 
+from .auth import authenticate, AuthError
 from .config import AppConfig, CatalogueEntry
+
+_api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
 class HandshakeRequest(BaseModel):
@@ -43,6 +47,8 @@ def create_app(
     Receives references to the live config, catalogue, and the handshake function
     from proxy_server so state is shared.
     """
+    from fastapi.middleware.cors import CORSMiddleware
+
     app = FastAPI(
         title="Dynamic MCP Proxy — HTTP Sidecar",
         description=(
@@ -60,12 +66,27 @@ def create_app(
     )
 
     @app.post("/handshake", response_model=HandshakeResponse)
-    async def handshake(body: HandshakeRequest, request: Request) -> Any:
+    async def handshake(
+        body: HandshakeRequest,
+        request: Request,
+        api_key: Optional[str] = Security(_api_key_header),
+    ) -> Any:
         """
         Pre-warm the proxy by sending project context before the MCP connection opens.
         The proxy activates relevant servers so tools/list is ready immediately.
         """
         import json as _json
+
+        # Enforce auth when enabled
+        bearer_token: Optional[str] = None
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            bearer_token = auth_header.removeprefix("Bearer ").strip()
+
+        try:
+            authenticate(bearer_token=bearer_token, api_key=api_key, config=config)
+        except AuthError as exc:
+            raise HTTPException(status_code=401, detail=str(exc))
 
         try:
             result_str = handshake_fn(
@@ -84,8 +105,11 @@ def create_app(
                     f"Connect via MCP and call tools/list to see available tools."
                 ),
             )
+        except HTTPException:
+            raise
         except Exception as exc:
-            raise HTTPException(status_code=500, detail=str(exc))
+            sys.stderr.write(f"[api] Handshake failed: {exc}\n")
+            raise HTTPException(status_code=500, detail="Internal server error")
 
     @app.get("/health")
     async def health() -> dict:

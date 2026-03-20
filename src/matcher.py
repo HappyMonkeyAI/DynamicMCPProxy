@@ -48,8 +48,10 @@ class RankedEntry:
 # ---------------------------------------------------------------------------
 
 def _normalise(tokens: list[str]) -> set[str]:
-    """Lowercase + strip punctuation for consistent comparison."""
-    return {re.sub(r"[^a-z0-9]", "", t.lower()) for t in tokens if t}
+    """Lowercase + strip punctuation for consistent comparison.
+    Preserves meaningful punctuation (+, #, .) so C++, C#, Node.js remain distinct.
+    """
+    return {re.sub(r"[^a-z0-9+#.-]", "", t.lower()) for t in tokens if t}
 
 
 def _tag_overlap_score(context_tokens: set[str], entry: CatalogueEntry) -> float:

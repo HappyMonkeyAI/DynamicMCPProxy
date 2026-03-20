@@ -78,6 +78,8 @@ class CatalogueEntry(BaseModel):
     runtime: Literal["stdio", "sse", "http"] = "stdio"
     # Optional env vars required by this server (keys only, values from caller)
     env_vars: list[str] = Field(default_factory=list)
+    # Best-effort estimate of how many tools this server exposes (used for budget tracking)
+    estimated_tools: int = 10
 
 
 # ---------------------------------------------------------------------------
@@ -135,8 +137,13 @@ def remove_proxy(name: str, config: AppConfig, path: Path | str | None = None) -
     return False
 
 
-def load_catalogue(config: AppConfig) -> list[CatalogueEntry]:
-    """Load the bundled MCP server catalogue, merged with user.catalogue.json if present."""
+def load_catalogue(config: AppConfig, user_catalogue_path: Path | str | None = None) -> list[CatalogueEntry]:
+    """Load the bundled MCP server catalogue, merged with user.catalogue.json if present.
+
+    Args:
+        config: AppConfig with catalogue_path set.
+        user_catalogue_path: Override path for user catalogue (useful in tests).
+    """
     def _load_file(path: Path) -> list[CatalogueEntry]:
         if not path.exists():
             return []
@@ -156,7 +163,11 @@ def load_catalogue(config: AppConfig) -> list[CatalogueEntry]:
     entries = _load_file(cat_path)
 
     # Merge user catalogue — user entries take precedence (overwrite by name)
-    user_cat_path = Path(__file__).parent.parent / "user.catalogue.json"
+    if user_catalogue_path is not None:
+        user_cat_path = Path(user_catalogue_path)
+    else:
+        user_cat_path = Path(__file__).parent.parent / "user.catalogue.json"
+
     user_entries = _load_file(user_cat_path)
     if user_entries:
         existing = {e.name: i for i, e in enumerate(entries)}
