@@ -4,6 +4,31 @@ A smart MCP proxy server that **lazily loads relevant MCP tool servers based on 
 
 ## Quick Start
 
+### Prerequisites
+
+The proxy dynamically activates MCP servers from the catalogue, which use these runtime tools:
+
+- **Node.js + npx** — for `npx`-based servers (GitHub, GitLab, Puppeteer, Slack, etc.)
+- **Python + uv** — for `uvx`-based servers (fetch, git, time, Wikipedia, arXiv, etc.)
+
+Install them:
+
+```bash
+# Node.js (includes npx)
+# Ubuntu/Debian:
+sudo apt install nodejs npm
+
+# macOS:
+brew install node
+
+# Python + uv
+# Ubuntu/Debian/macOS:
+curl -LsSf https://astral.sh/uv/install.sh | sh
+# or: pip install uv
+```
+
+Without these, the proxy will start but fail to mount catalogue servers with errors like `command not found: npx` or `command not found: uvx`.
+
 ### Install
 
 ```bash
@@ -44,8 +69,8 @@ Once published to PyPI, it simplifies to:
 ## How It Works
 
 ```
-IDE connects → proxy exposes proxy.* tools + MCP Resources + Prompts
-AI calls proxy.handshake({ tech_stack, task_description })
+IDE connects → proxy exposes proxy_* tools + MCP Resources + Prompts
+AI calls proxy_handshake({ tech_stack, task_description })
   → Matcher scores 27 catalogue entries
   → Top-5 servers activated (lazily mounted)
   → tools/list now includes those servers' tools
@@ -56,21 +81,21 @@ AI calls proxy.handshake({ tech_stack, task_description })
 
 | MCP Method | What the AI Sees |
 |---|---|
-| `tools/list` | Minimal `proxy.*` management tools |
+| `tools/list` | Minimal `proxy_*` management tools |
 | `resources/list` + `resources/read` | Live health, proxy info, server inventory |
 | `prompts/list` | `suggest_tools_for_context` guided workflow |
 
-## proxy.* Tools
+## proxy_* Tools
 
 | Tool | Description |
 |---|---|
-| `proxy.handshake(tech_stack, task_description, ...)` | Context handshake — activates relevant servers |
-| `proxy.list_active_servers()` | Currently mounted servers + tool counts |
-| `proxy.list_available_servers(filter_tag?)` | Browse catalogue |
-| `proxy.activate_server(name)` | Explicitly mount a server |
-| `proxy.deactivate_server(name)` | Free up tool budget |
-| `proxy.add_custom_proxy(name, url, tags, runtime)` | Add an ad-hoc server |
-| `proxy.get_metrics()` | Live memory/CPU/uptime metrics |
+| `proxy_handshake(tech_stack, task_description, ...)` | Context handshake — activates relevant servers |
+| `proxy_list_active_servers()` | Currently mounted servers + tool counts |
+| `proxy_list_available_servers(filter_tag?)` | Browse catalogue |
+| `proxy_activate_server(name)` | Explicitly mount a server |
+| `proxy_deactivate_server(name)` | Free up tool budget |
+| `proxy_add_custom_proxy(name, url, tags, runtime)` | Add an ad-hoc server |
+| `proxy_get_metrics()` | Live memory/CPU/uptime metrics |
 
 ## MCP Resources
 
