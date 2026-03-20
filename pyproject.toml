@@ -18,6 +18,7 @@ dependencies = [
     "watchdog>=4.0.0",
     "PyJWT>=2.8.0",
     "cryptography>=42.0.0",
+    "python-dotenv>=1.0.0",
 ]
 
 [project.optional-dependencies]

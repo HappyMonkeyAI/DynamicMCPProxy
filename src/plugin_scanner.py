@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import stat
+import sys
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -29,6 +30,10 @@ except ImportError:
 
 RegisterCallback = Callable[[str, str], None]   # (name, command)
 DeregisterCallback = Callable[[str], None]       # (name,)
+
+
+def _log(msg: str) -> None:
+    sys.stderr.write(f"{msg}\n")
 
 
 def _is_executable(path: Path) -> bool:
@@ -60,20 +65,20 @@ class _PluginEventHandler(FileSystemEventHandler):
         if path.name.startswith("."):
             return
         if not _is_executable(path):
-            print(f"[plugin_scanner] Skipping non-executable: {path.name}")
+            _log(f"[plugin_scanner] Skipping non-executable: {path.name}")
             return
         name = _name_from_path(path)
         if name in self._registered:
             return
         command = str(path.resolve())
-        print(f"[plugin_scanner] Registering hot-plug plugin: {name} ({command})")
+        _log(f"[plugin_scanner] Registering hot-plug plugin: {name} ({command})")
         self._registered.add(name)
         self._on_register(name, command)
 
     def _try_deregister(self, path: Path) -> None:
         name = _name_from_path(path)
         if name in self._registered:
-            print(f"[plugin_scanner] Deregistering plugin: {name}")
+            _log(f"[plugin_scanner] Deregistering plugin: {name}")
             self._registered.discard(name)
             self._on_deregister(name)
 
@@ -129,11 +134,10 @@ class PluginScanner:
     def start(self) -> None:
         """Start watching the plugins directory."""
         if not _watchdog_available:
-            print(
+            _log(
                 "[plugin_scanner] watchdog is not installed. "
                 "Hot-plug scanning disabled. Install with: uv add watchdog"
             )
-            # Still scan existing files at startup
             self.scan_existing()
             return
 
@@ -145,7 +149,7 @@ class PluginScanner:
         observer.schedule(handler, str(self._dir), recursive=False)
         observer.start()
         self._observer = observer
-        print(f"[plugin_scanner] Watching {self._dir} for hot-plug plugins.")
+        _log(f"[plugin_scanner] Watching {self._dir} for hot-plug plugins.")
 
     def stop(self) -> None:
         """Stop the file watcher."""

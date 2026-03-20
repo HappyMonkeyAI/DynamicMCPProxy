@@ -2,6 +2,7 @@
 .env
 .env.*
 proxy_config.json
+user.catalogue.json
 *.pem
 *.key
 *.pub

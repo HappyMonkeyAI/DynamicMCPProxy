@@ -523,7 +523,7 @@ def _on_plugin_register(name: str, command: str) -> None:
 
 def _on_plugin_deregister(name: str) -> None:
     ok, msg = _do_unmount(name)
-    print(f"[plugin_scanner] {msg}")
+    sys.stderr.write(f"[plugin_scanner] {msg}\n")
 
 
 def _startup() -> None:

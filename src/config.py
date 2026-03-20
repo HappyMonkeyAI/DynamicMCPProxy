@@ -8,7 +8,11 @@ import os
 from pathlib import Path
 from typing import Literal, Optional
 
+from dotenv import load_dotenv
 from pydantic import BaseModel, Field
+
+# Load .env from project root (no-op if file doesn't exist)
+load_dotenv(Path(__file__).parent.parent / ".env", override=False)
 
 # ---------------------------------------------------------------------------
 # Default config file location (can be overridden via env var)
@@ -97,7 +101,8 @@ def load_config(path: Path | str | None = None) -> AppConfig:
             data = json.load(f)
         return AppConfig.model_validate(data)
     except Exception as exc:
-        print(f"[config] Warning: could not load config ({exc}), using defaults.")
+        import sys
+        sys.stderr.write(f"[config] Warning: could not load config ({exc}), using defaults.\n")
         return AppConfig()
 
 
@@ -131,16 +136,34 @@ def remove_proxy(name: str, config: AppConfig, path: Path | str | None = None) -
 
 
 def load_catalogue(config: AppConfig) -> list[CatalogueEntry]:
-    """Load the bundled MCP server catalogue."""
+    """Load the bundled MCP server catalogue, merged with user.catalogue.json if present."""
+    def _load_file(path: Path) -> list[CatalogueEntry]:
+        if not path.exists():
+            return []
+        try:
+            with open(path) as f:
+                data = json.load(f)
+            return [CatalogueEntry.model_validate(e) for e in data]
+        except Exception as exc:
+            import sys
+            sys.stderr.write(f"[config] Warning: could not load catalogue {path} ({exc})\n")
+            return []
+
     cat_path = Path(config.catalogue_path)
     if not cat_path.is_absolute():
         cat_path = Path(__file__).parent.parent / cat_path
-    if not cat_path.exists():
-        return []
-    try:
-        with open(cat_path) as f:
-            data = json.load(f)
-        return [CatalogueEntry.model_validate(e) for e in data]
-    except Exception as exc:
-        print(f"[config] Warning: could not load catalogue ({exc})")
-        return []
+
+    entries = _load_file(cat_path)
+
+    # Merge user catalogue — user entries take precedence (overwrite by name)
+    user_cat_path = Path(__file__).parent.parent / "user.catalogue.json"
+    user_entries = _load_file(user_cat_path)
+    if user_entries:
+        existing = {e.name: i for i, e in enumerate(entries)}
+        for ue in user_entries:
+            if ue.name in existing:
+                entries[existing[ue.name]] = ue
+            else:
+                entries.append(ue)
+
+    return entries
