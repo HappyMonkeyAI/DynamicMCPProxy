@@ -80,7 +80,8 @@ def test_load_catalogue(tmp_path: Path):
     cat_path.write_text(json.dumps(cat_data))
 
     cfg = AppConfig(catalogue_path=str(cat_path))
-    entries = load_catalogue(cfg)
+    # Pass a nonexistent user catalogue path to isolate from the real one
+    entries = load_catalogue(cfg, user_catalogue_path=tmp_path / "user.catalogue.json")
     assert len(entries) == 1
     assert entries[0].name == "github"
     assert "github" in entries[0].tags
@@ -88,5 +89,5 @@ def test_load_catalogue(tmp_path: Path):
 
 def test_load_catalogue_missing(tmp_path: Path):
     cfg = AppConfig(catalogue_path=str(tmp_path / "missing.json"))
-    entries = load_catalogue(cfg)
+    entries = load_catalogue(cfg, user_catalogue_path=tmp_path / "user.catalogue.json")
     assert entries == []

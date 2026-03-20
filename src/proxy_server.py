@@ -25,6 +25,7 @@ import asyncio
 import json
 import os
 import platform
+import shlex
 import sys
 import threading
 import time
@@ -57,6 +58,7 @@ from .guardrails import (
     init_audit_log,
     init_rate_limiter,
     scan_tool_description,
+    truncate_result,
 )
 from .matcher import ProjectContext, rank_servers
 from .plugin_scanner import PluginScanner
@@ -112,13 +114,11 @@ def _evict_lru_if_needed(needed: int = 0) -> None:
 def _estimate_tool_count(entry: ProxyEntry) -> int:
     """
     Best-effort estimate of tools a server will expose.
-    Uses catalogue data if available, otherwise assumes 10.
+    Uses estimated_tools from the catalogue entry if available, otherwise assumes 10.
     """
     for cat in _catalogue:
         if cat.name == entry.name:
-            # Known heavy hitters
-            known = {"atlassian": 72, "hubspot": 30, "zendesk": 25}
-            return known.get(cat.name, 10)
+            return cat.estimated_tools
     return 10
 
 
@@ -155,11 +155,18 @@ def _do_unmount(name: str) -> tuple[bool, str]:
             return False, f"'{name}' is not mounted."
         _active_servers.pop(name)
 
-    # FastMCP does not expose an unmount() API in the current version;
-    # we track deactivation in _active_servers and the server will stop
-    # being treated as active. Tools previously mounted remain until
-    # the proxy process restarts — best-effort for now.
-    return True, f"Deregistered '{name}' from active tracking (takes full effect on restart)."
+    # Remove the matching _WrappedProvider from FastMCP's providers list.
+    # Mounted servers appear as _WrappedProvider with a Namespace transform
+    # whose ._prefix equals the namespace string used at mount time.
+    mcp.providers[:] = [
+        p for p in mcp.providers
+        if not (
+            hasattr(p, "_transforms")
+            and any(getattr(t, "_prefix", None) == name for t in p._transforms)
+        )
+    ]
+
+    return True, f"Unmounted '{name}'."
 
 
 def _resolve_catalogue_entry(name: str) -> Optional[CatalogueEntry]:
@@ -188,8 +195,9 @@ def _mcp_config_for_entry(entry: ProxyEntry) -> dict:
     if entry.runtime in ("sse", "http"):
         return {"mcpServers": {entry.name: {"url": entry.url, "transport": entry.runtime}}}
     # stdio — strip the "stdio://" prefix and split into command + args
+    # shlex.split handles paths/args with spaces correctly
     command_str = entry.url.removeprefix("stdio://")
-    parts = command_str.split()
+    parts = shlex.split(command_str)
     return {"mcpServers": {entry.name: {"command": parts[0], "args": parts[1:]}}}
 
 
@@ -331,6 +339,9 @@ def proxy_handshake(
         open_files: File paths currently open in the IDE (optional, helps infer stack)
         requirements: Package names from requirements.txt / package.json (optional)
     """
+    if _config.guardrails_enabled and not check_rate_limit("anonymous"):
+        return json.dumps({"ok": False, "error": "Rate limit exceeded. Try again later."})
+
     t0 = time.monotonic()
     context = ProjectContext(
         tech_stack=tech_stack or [],
@@ -347,8 +358,10 @@ def proxy_handshake(
         entry = _catalogue_entry_to_proxy(r.entry)
         if entry is None:
             continue
-        # Skip already-active servers
+        # Already-active: move to end of LRU so it isn't evicted prematurely
         if r.entry.name in _active_servers:
+            with _lock:
+                _active_servers.move_to_end(r.entry.name)
             activated.append(r.entry.name)
             continue
         ok, msg = _do_mount(entry)
@@ -371,13 +384,15 @@ def proxy_handshake(
             "tech_stack": tech_stack,
             "task_description": task_description[:120] if task_description else "",
         },
-
         "tip": (
             "Use proxy_list_available_servers() to browse more, "
             "or proxy_activate_server(name) to load specific ones."
         ),
     }
-    return json.dumps(result, indent=2)
+    result_str = json.dumps(result, indent=2)
+    if _config.guardrails_enabled:
+        result_str = truncate_result(result_str)
+    return result_str
 
 
 @mcp.tool(name="proxy_list_active_servers")
@@ -436,6 +451,9 @@ def proxy_activate_server(name: str) -> str:
     Args:
         name: Server name as shown in proxy.list_available_servers()
     """
+    if _config.guardrails_enabled and not check_rate_limit("anonymous"):
+        return json.dumps({"ok": False, "error": "Rate limit exceeded. Try again later."})
+
     t0 = time.monotonic()
     cat = _resolve_catalogue_entry(name)
     if cat is None:
@@ -451,7 +469,10 @@ def proxy_activate_server(name: str) -> str:
           latency_ms=float(round((time.monotonic() - t0) * 1000, 1)),
           extra={"server": name})
 
-    return json.dumps({"ok": ok, "message": msg, "active_tool_count": _tool_count()})
+    result = json.dumps({"ok": ok, "message": msg, "active_tool_count": _tool_count()})
+    if _config.guardrails_enabled:
+        result = truncate_result(result)
+    return result
 
 
 @mcp.tool(name="proxy_deactivate_server")
@@ -462,6 +483,9 @@ def proxy_deactivate_server(name: str) -> str:
     Args:
         name: Server name as shown in proxy.list_active_servers()
     """
+    if _config.guardrails_enabled and not check_rate_limit("anonymous"):
+        return json.dumps({"ok": False, "error": "Rate limit exceeded. Try again later."})
+
     t0 = time.monotonic()
     ok, msg = _do_unmount(name)
     audit(tool="proxy_deactivate_server", outcome="ok" if ok else "error",
@@ -482,14 +506,25 @@ def proxy_add_custom_proxy(
 
     """
     Register a custom (non-catalogue) MCP server and optionally activate it.
+    Only SSE and HTTP runtimes are accepted; stdio is restricted to prevent
+    arbitrary command execution.
 
     Args:
         name: A unique identifier for this server
-        url: SSE URL (e.g. http://localhost:8100/sse) or stdio:// command
+        url: SSE URL (e.g. http://localhost:8100/sse) or HTTP URL
         tags: Tag list for future discovery matching
-        runtime: "sse", "http", or "stdio"
+        runtime: "sse" or "http" (stdio is not permitted for custom proxies)
         activate_now: If True, mount the server immediately
     """
+    if _config.guardrails_enabled and not check_rate_limit("anonymous"):
+        return json.dumps({"ok": False, "error": "Rate limit exceeded. Try again later."})
+
+    if runtime == "stdio":
+        return json.dumps({
+            "ok": False,
+            "error": "stdio runtime is restricted for custom proxies to prevent arbitrary command execution.",
+        })
+
     entry = ProxyEntry(
         name=name, url=url, tags=tags or [], runtime=runtime, active=activate_now
     )

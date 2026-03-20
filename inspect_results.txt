@@ -1,0 +1,6 @@
+Namespace._prefix='ns1'
+Namespace._name_prefix='ns1_'
+pop+_prefix: before=['ns1_tool_a', 'ns2_tool_b'] after=['ns2_tool_b']
+pop+_name_prefix: before=['ns1_tool_a', 'ns2_tool_b'] after=['ns1_tool_a', 'ns2_tool_b']
+pop+repr: before=['ns1_tool_a', 'ns2_tool_b'] after=['ns2_tool_b']
+pop+_name_prefix_us: before=['ns1_tool_a', 'ns2_tool_b'] after=['ns2_tool_b']
