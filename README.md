@@ -1,20 +1,45 @@
 # Dynamic MCP Proxy
 
-A smart MCP proxy server that **lazily loads relevant MCP tool servers based on your project context**, keeping AI tool counts within recommended limits (≤ 50 tools for Google Antigravity).
+A smart MCP proxy server that lazily loads relevant MCP tool servers based on your project context, keeping AI tool counts within recommended limits (≤ 50 tools for Google Antigravity).
+
+Part of the [Anti-Gravity Agents Prompt Protocol](https://github.com/SPhillips1337/AntigravityAgentsPromptProtocol) ecosystem.
+
+## How It Works
+
+```
+IDE connects → proxy exposes proxy_* tools + MCP Resources + Prompts
+AI calls proxy_handshake({ tech_stack, task_description })
+  → Matcher scores catalogue entries
+  → Top-5 servers activated (lazily mounted as stdio subprocesses or SSE)
+  → tools/list now includes those servers' tools
+  → Budget cap (50 tools) enforced via LRU eviction
+```
 
 ## Quick Start
 
 ### Prerequisites
 
-The proxy dynamically activates MCP servers from the catalogue, which use `npx` (Node.js) and `uvx` (uv) to run. These need to be on the `PATH` that your IDE uses when spawning the proxy process.
-
-The easiest way to ensure this is to add a `PATH` env var to your MCP config entry (see below). Find your actual paths with `which npx` and `which uvx`.
+Catalogue servers run via `npx` (Node.js) and `uvx` (uv). These must be on the PATH your IDE uses when spawning the proxy. Add them explicitly in the MCP config `env` block (see below). Find your paths with `type npx` and `type uvx`.
 
 ### Install
 
 ```bash
-cd dynamic-mcp-proxy-server
 uv sync
+```
+
+### Configure
+
+Copy the example config:
+
+```bash
+cp proxy_config.json.example proxy_config.json
+```
+
+Set up your environment and private catalogue:
+
+```bash
+cp .env.example .env          # fill in your API keys
+# user.catalogue.json is auto-created or copy from your IDE's mcp_config.json
 ```
 
 ### Add to your IDE (Antigravity / opencode / Claude Desktop)
@@ -28,7 +53,7 @@ uv sync
         "run",
         "--quiet",
         "--project",
-        "/home/user/dynamic-mcp-proxy-server",
+        "/path/to/dynamic-mcp-proxy-server",
         "python", "-m", "src.proxy_server"
       ],
       "env": {
@@ -39,38 +64,7 @@ uv sync
 }
 ```
 
-Adjust the `PATH` value to match your system (`which npx` and `which uvx` will give you the right directories).
-
-Once published to PyPI, it simplifies to:
-```json
-{
-  "mcpServers": {
-    "dynamic-proxy": {
-      "command": "uvx",
-      "args": ["dynamic-mcp-proxy"]
-    }
-  }
-}
-```
-
-## How It Works
-
-```
-IDE connects → proxy exposes proxy_* tools + MCP Resources + Prompts
-AI calls proxy_handshake({ tech_stack, task_description })
-  → Matcher scores 27 catalogue entries
-  → Top-5 servers activated (lazily mounted)
-  → tools/list now includes those servers' tools
-  → Budget cap (50 tools) enforced via LRU eviction
-```
-
-## MCP Discovery Surface (Spec-Compliant)
-
-| MCP Method | What the AI Sees |
-|---|---|
-| `tools/list` | Minimal `proxy_*` management tools |
-| `resources/list` + `resources/read` | Live health, proxy info, server inventory |
-| `prompts/list` | `suggest_tools_for_context` guided workflow |
+Adjust `PATH` to match your system (`type npx` and `type uvx` show the right directories).
 
 ## proxy_* Tools
 
@@ -92,9 +86,47 @@ AI calls proxy_handshake({ tech_stack, task_description })
 | `mcp://proxy/health` | Live health (uptime, memory, active tools) |
 | `mcp://proxy/servers` | Full server inventory (active + available) |
 
+## MCP Discovery Surface
+
+| MCP Method | What the AI Sees |
+|---|---|
+| `tools/list` | Minimal `proxy_*` management tools |
+| `resources/list` + `resources/read` | Live health, proxy info, server inventory |
+| `prompts/list` | `suggest_tools_for_context` guided workflow |
+
+## Catalogue
+
+`catalogue.json` — 45 public MCP servers (GitHub, Docker, Postgres, Slack, Stripe, etc.).
+
+`user.catalogue.json` — your private overlay (gitignored). Add personal servers here — local paths, private APIs, custom tools. Entries with the same name override the public catalogue.
+
+```json
+[
+  {
+    "name": "my-server",
+    "description": "My private MCP server",
+    "command": "python /path/to/server.py",
+    "tags": ["custom"],
+    "tech_stack": ["any"],
+    "runtime": "stdio",
+    "env_vars": ["MY_API_KEY"]
+  }
+]
+```
+
+## Environment Variables
+
+`.env` (gitignored) is loaded automatically at startup. Copy `.env.example` to get started:
+
+```bash
+cp .env.example .env
+```
+
+Keys follow the `env_vars` field in each catalogue entry. Values in real environment variables always take precedence over the `.env` file.
+
 ## Configuration
 
-Copy `proxy_config.json` (auto-generated with safe defaults on first run):
+`proxy_config.json` (gitignored, auto-generated with safe defaults):
 
 ```json
 {
@@ -103,40 +135,33 @@ Copy `proxy_config.json` (auto-generated with safe defaults on first run):
   "guardrails_enabled": true,
   "rate_limit_rpm": 120,
   "catalogue_path": "catalogue.json",
-  "audit_log_path": "audit.log",
-  "jwt_public_key_path": null,
-  "hmac_api_key": null,
-  "tool_allowlist": [],
-  "tool_denylist": [],
-  "proxies": []
+  "audit_log_path": "audit.log"
 }
 ```
 
-**Key settings:**
-- `tool_budget` — max tools exposed at once (default 50, matches Antigravity recommendation)
-- `auth_enabled` — set `true` in production; uses JWT RS256 + HMAC API key
+Key settings:
+- `tool_budget` — max tools exposed at once (default 50, matches Antigravity limit)
+- `auth_enabled` — JWT RS256 + HMAC API key auth for production use
 - `guardrails_enabled` — prompt-injection scanning + result size caps
 
 ## Security
 
 When `auth_enabled = true`:
-- **JWT (RS256)** — primary auth; set `jwt_public_key_path` to your RSA public key PEM file
-- **HMAC API key** — service-to-service; set `hmac_api_key` (passed via `X-API-Key` header)
-- **Guardrails** — 8 prompt-injection pattern checks on all tool descriptions
-- **Audit log** — every tool call logged to `audit.log` (JSON lines)
-- **Rate limiting** — configurable RPM per caller
+- JWT (RS256) — set `jwt_public_key_path` to your RSA public key PEM
+- HMAC API key — set `hmac_api_key` (passed via `X-API-Key` header)
+- Guardrails — 8 prompt-injection pattern checks on all tool descriptions
+- Audit log — every tool call logged to `audit.log` (JSON lines)
+- Rate limiting — configurable RPM per caller
 
 ## Hot-Plug Plugins
 
-Drop any executable MCP provider script into `./plugins/`. The proxy detects it via `watchdog`, attempts a handshake, and registers it live — no restart needed.
+Drop any executable MCP server script into `./plugins/`. The proxy detects it via watchdog and registers it live — no restart needed.
 
-## Update the Catalogue
+## Update the Public Catalogue
 
 ```bash
 uv run python scripts/sync_catalogue.py
 ```
-
-Fetches the latest server list from [github.com/modelcontextprotocol/servers](https://github.com/modelcontextprotocol/servers) and merges with your existing `catalogue.json`.
 
 ## Run Tests
 
@@ -146,7 +171,7 @@ uv run pytest tests/ -v
 
 ## Optional HTTP Endpoint
 
-The proxy also starts a minimal FastAPI sidecar on `:8765`:
+Disabled by default. Enable with `ENABLE_HTTP_SIDECAR=1`:
 
 ```bash
 curl -X POST http://localhost:8765/handshake \
@@ -154,9 +179,18 @@ curl -X POST http://localhost:8765/handshake \
   -d '{"tech_stack": ["python", "fastapi"], "task_description": "Building a REST API"}'
 ```
 
-This pre-warms the proxy before the MCP connection opens. Enable with `ENABLE_HTTP_SIDECAR=1`.
+## Long-Term Memory
+
+This project uses the Anti-Gravity LTM protocol. Agent context lives in `.antigravity/memories/` (gitignored — local to each developer):
+
+- `patterns_and_lessons.md` — solved problems, failure post-mortems
+- `codebase_insights/` — module-level hidden knowledge
+- `architectural_decisions/` — design tradeoffs and rationale
+
+Bootstrap your local LTM by following [BOOTSTRAP.md](https://github.com/SPhillips1337/AntigravityAgentsPromptProtocol/blob/main/BOOTSTRAP.md) from the protocol repo. See `AGENTS.md` for the full agent protocol.
 
 ## Inspiration
 
-- [FastMCP dynamic proxy pattern](https://dev.to/amartyadev/building-a-dynamic-mcp-proxy-server-in-python-16jf)  
+- [FastMCP dynamic proxy pattern](https://dev.to/amartyadev/building-a-dynamic-mcp-proxy-server-in-python-16jf)
 - [mcp-scan guardrail design](https://github.com/invariantlabs-ai/mcp-scan)
+- [Anti-Gravity Agents Prompt Protocol](https://github.com/SPhillips1337/AntigravityAgentsPromptProtocol)

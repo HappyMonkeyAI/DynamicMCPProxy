@@ -12,6 +12,9 @@ user.catalogue.json
 credentials.json
 secrets.json
 
+# LTM / Agent memory (contains personal context, local paths, private insights)
+.antigravity/
+
 # Runtime / Audit
 audit.log
 *.log
