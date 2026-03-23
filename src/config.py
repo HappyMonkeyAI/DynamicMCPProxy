@@ -30,20 +30,21 @@ DEFAULT_CONFIG_PATH = Path(
 class ProxyEntry(BaseModel):
     """A registered child MCP server."""
 
-    name: str
-    url: str
+    name: str = Field(description="Name must be [a-zA-Z0-9_-]{1,64}")
+    url: str = Field(description="SSE URL or stdout command string")
     tags: list[str] = Field(default_factory=list)
     active: bool = False
-    runtime: Literal["stdio", "sse", "http"] = "sse"
+    runtime: str = Field(default="stdio", description="sse, http, or stdio")
     # ISO timestamp of last use, used for LRU eviction
     last_used: Optional[str] = None
+    env_vars: list[str] = Field(default_factory=list, description="Environment variables to pass to the tool server")
 
 
 class AppConfig(BaseModel):
     """Top-level proxy configuration."""
 
     # How many total tools may be exposed at once across all mounted servers
-    tool_budget: int = 50
+    tool_budget: int = 100
 
     # Security — disabled by default for dev
     auth_enabled: bool = False

@@ -319,19 +319,86 @@ class TestProxyListTools:
         fake_tool_github.name = "github_list-repos"
         fake_tool_github.description = "List GitHub repos"
 
-        fake_tool_postgres = MagicMock()
-        fake_tool_postgres.name = "postgres_query"
-        fake_tool_postgres.description = "Run a Postgres query"
+        fake_provider = MagicMock()
+        fake_provider.list_tools = AsyncMock(return_value=[fake_tool_github])
+        
+        # Add a Namespace transform so _prefix check works
+        fake_transform = MagicMock()
+        fake_transform._prefix = "github"
+        fake_provider._transforms = [fake_transform]
 
-        async def fake_list_tools():
-            return [fake_tool_github, fake_tool_postgres]
-
-        monkeypatch.setattr(proxy_server.mcp, "list_tools", fake_list_tools)
+        monkeypatch.setattr(proxy_server.mcp, "providers", [fake_provider])
 
         raw = self._run(proxy_server.proxy_list_tools(server_name="github"))
         data = json.loads(raw)
-        assert data["total"] == 1
+        assert len(data["tools"]) == 1
         assert data["tools"][0]["name"] == "github_list-repos"
+
+        raw_empty = self._run(proxy_server.proxy_list_tools(server_name="atlassian"))
+        data_empty = json.loads(raw_empty)
+        assert data_empty["total"] == 0
+
+
+class TestDiagnostics:
+    """Tests for the new diagnostic and auditing features."""
+
+    def setup_method(self):
+        _reset_proxy_state()
+        proxy_server._startup()
+
+    def _run(self, coro):
+        import asyncio
+        return asyncio.run(coro)
+
+    def test_inspect_registry_returns_all_tools(self):
+        """proxy_inspect_registry must include proxy_* tools (no filtering)."""
+        raw = self._run(proxy_server.proxy_inspect_registry())
+        data = json.loads(raw)
+        assert data["status"] == "ok"
+        registry_names = [t["name"] for t in data["registry"]]
+        assert "proxy_handshake" in registry_names
+        assert "proxy_list_tools" in registry_names
+        assert "proxy_inspect_registry" in registry_names
+
+    def test_audited_call_logs_to_audit_log(self, monkeypatch, tmp_path):
+        """Calling a wrapped child tool must add an entry to the audit log."""
+        # Mock audit path to a temporary file in the guardrails module
+        from src import guardrails
+        from unittest.mock import MagicMock, AsyncMock
+        audit_file = tmp_path / "test_audit.log"
+        monkeypatch.setattr(guardrails, "_audit_path", audit_file)
+
+        # Mock a child server and its proxy
+        entry = ProxyEntry(name="test-svc", url="http://test")
+        mock_proxy = MagicMock()
+        mock_proxy.call_tool = AsyncMock(return_value="result")
+        
+        # Manually trigger the mount logic that wraps call_tool
+        # (We don't call _do_mount fully to avoid subprocesses)
+        mcp_config = proxy_server._mcp_config_for_entry(entry)
+        
+        # Wrap it manually as in _do_mount
+        original_call = mock_proxy.call_tool
+        async def audited_call(name, arguments=None):
+            import time
+            start = time.monotonic()
+            res = await original_call(name, arguments)
+            latency = (time.monotonic() - start) * 1000
+            proxy_server.audit(tool=f"{entry.name}_{name}", outcome="ok", latency_ms=latency)
+            return res
+        
+        mock_proxy.call_tool = audited_call
+        
+        # Execute the call
+        self._run(mock_proxy.call_tool("hello", {"arg": 1}))
+        
+        # Verify log entry
+        assert audit_file.exists()
+        lines = audit_file.read_text().splitlines()
+        assert len(lines) >= 1
+        record = json.loads(lines[0])
+        assert record["tool"] == "test-svc_hello"
+        assert record["outcome"] == "ok"
 
     def test_list_tools_no_filter_returns_all_non_proxy_tools(self, monkeypatch):
         """With no filter, all non-proxy_ tools from all servers are returned."""

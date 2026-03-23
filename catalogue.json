@@ -3,26 +3,60 @@
     "name": "github",
     "description": "GitHub MCP server — repos, issues, PRs, code search, branches, commits",
     "command": "npx -y @modelcontextprotocol/server-github",
-    "tags": ["github", "git", "code", "version_control", "issues", "pull_requests", "repos"],
-    "tech_stack": ["any"],
+    "tags": [
+      "github",
+      "git",
+      "code",
+      "version_control",
+      "issues",
+      "pull_requests",
+      "repos"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
-    "env_vars": ["GITHUB_PERSONAL_ACCESS_TOKEN"]
+    "env_vars": [
+      "GITHUB_PERSONAL_ACCESS_TOKEN"
+    ]
   },
   {
     "name": "gitlab",
     "description": "GitLab MCP server — repos, issues, merge requests, CI pipelines",
     "command": "npx -y @modelcontextprotocol/server-gitlab",
-    "tags": ["gitlab", "git", "code", "version_control", "ci", "pipelines"],
-    "tech_stack": ["any"],
+    "tags": [
+      "gitlab",
+      "git",
+      "code",
+      "version_control",
+      "ci",
+      "pipelines"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
-    "env_vars": ["GITLAB_PERSONAL_ACCESS_TOKEN", "GITLAB_URL"]
+    "env_vars": [
+      "GITLAB_PERSONAL_ACCESS_TOKEN",
+      "GITLAB_URL"
+    ]
   },
   {
     "name": "filesystem",
     "description": "Local filesystem access — read, write, list files and directories",
     "command": "npx -y @modelcontextprotocol/server-filesystem",
-    "tags": ["filesystem", "files", "directories", "local", "io", "read", "write"],
-    "tech_stack": ["any"],
+    "tags": [
+      "filesystem",
+      "files",
+      "directories",
+      "local",
+      "io",
+      "read",
+      "write"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -30,17 +64,46 @@
     "name": "postgres",
     "description": "PostgreSQL MCP server — read-only SQL queries, schema inspection",
     "command": "npx -y @modelcontextprotocol/server-postgres",
-    "tags": ["postgres", "postgresql", "database", "sql", "rdbms"],
-    "tech_stack": ["python", "node", "go", "java", "rails", "django", "fastapi", "laravel"],
+    "tags": [
+      "postgres",
+      "postgresql",
+      "database",
+      "sql",
+      "rdbms"
+    ],
+    "tech_stack": [
+      "python",
+      "node",
+      "go",
+      "java",
+      "rails",
+      "django",
+      "fastapi",
+      "laravel"
+    ],
     "runtime": "stdio",
-    "env_vars": ["POSTGRES_CONNECTION_STRING"]
+    "env_vars": [
+      "POSTGRES_CONNECTION_STRING"
+    ]
   },
   {
     "name": "sqlite",
     "description": "SQLite MCP server — local SQLite database read and write access",
     "command": "npx -y @modelcontextprotocol/server-sqlite",
-    "tags": ["sqlite", "database", "sql", "local"],
-    "tech_stack": ["python", "node", "mobile", "electron", "django", "flask"],
+    "tags": [
+      "sqlite",
+      "database",
+      "sql",
+      "local"
+    ],
+    "tech_stack": [
+      "python",
+      "node",
+      "mobile",
+      "electron",
+      "django",
+      "flask"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -48,17 +111,35 @@
     "name": "brave-search",
     "description": "Brave Search API — web search, news search, local search",
     "command": "npx -y @modelcontextprotocol/server-brave-search",
-    "tags": ["search", "web", "brave", "news", "research"],
-    "tech_stack": ["any"],
+    "tags": [
+      "search",
+      "web",
+      "brave",
+      "news",
+      "research"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
-    "env_vars": ["BRAVE_API_KEY"]
+    "env_vars": [
+      "BRAVE_API_KEY"
+    ]
   },
   {
     "name": "memory",
     "description": "Persistent memory / knowledge graph — store and recall facts across sessions",
     "command": "npx -y @modelcontextprotocol/server-memory",
-    "tags": ["memory", "knowledge_graph", "persistence", "recall", "notes"],
-    "tech_stack": ["any"],
+    "tags": [
+      "memory",
+      "knowledge_graph",
+      "persistence",
+      "recall",
+      "notes"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -66,8 +147,19 @@
     "name": "fetch",
     "description": "HTTP fetch — retrieve and convert web content to markdown, web scraping",
     "command": "uvx mcp-server-fetch",
-    "tags": ["http", "fetch", "web", "scraping", "rest", "api", "markdown", "html"],
-    "tech_stack": ["any"],
+    "tags": [
+      "http",
+      "fetch",
+      "web",
+      "scraping",
+      "rest",
+      "api",
+      "markdown",
+      "html"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -75,8 +167,20 @@
     "name": "puppeteer",
     "description": "Browser automation with Puppeteer — navigate, screenshot, interact with web pages",
     "command": "npx -y @modelcontextprotocol/server-puppeteer",
-    "tags": ["browser", "automation", "puppeteer", "screenshot", "e2e", "testing"],
-    "tech_stack": ["javascript", "typescript", "node", "playwright"],
+    "tags": [
+      "browser",
+      "automation",
+      "puppeteer",
+      "screenshot",
+      "e2e",
+      "testing"
+    ],
+    "tech_stack": [
+      "javascript",
+      "typescript",
+      "node",
+      "playwright"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -84,8 +188,16 @@
     "name": "docker",
     "description": "Docker MCP server — manage containers, images, volumes, networks",
     "command": "npx -y @modelcontextprotocol/server-docker",
-    "tags": ["docker", "containers", "devops", "deployment", "ci"],
-    "tech_stack": ["any"],
+    "tags": [
+      "docker",
+      "containers",
+      "devops",
+      "deployment",
+      "ci"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -93,8 +205,16 @@
     "name": "kubernetes",
     "description": "Kubernetes MCP server — manage pods, deployments, services, namespaces",
     "command": "npx -y @modelcontextprotocol/server-kubernetes",
-    "tags": ["kubernetes", "k8s", "containers", "devops", "orchestration"],
-    "tech_stack": ["any"],
+    "tags": [
+      "kubernetes",
+      "k8s",
+      "containers",
+      "devops",
+      "orchestration"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -102,17 +222,36 @@
     "name": "slack",
     "description": "Slack MCP server — send messages, list channels, search conversations",
     "command": "npx -y @modelcontextprotocol/server-slack",
-    "tags": ["slack", "messaging", "communication", "notifications"],
-    "tech_stack": ["any"],
+    "tags": [
+      "slack",
+      "messaging",
+      "communication",
+      "notifications"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
-    "env_vars": ["SLACK_BOT_TOKEN", "SLACK_TEAM_ID"]
+    "env_vars": [
+      "SLACK_BOT_TOKEN",
+      "SLACK_TEAM_ID"
+    ]
   },
   {
     "name": "google-drive",
     "description": "Google Drive MCP server — list, read, search files in Google Drive",
     "command": "npx -y @modelcontextprotocol/server-gdrive",
-    "tags": ["google", "drive", "docs", "sheets", "files", "storage"],
-    "tech_stack": ["any"],
+    "tags": [
+      "google",
+      "drive",
+      "docs",
+      "sheets",
+      "files",
+      "storage"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -120,35 +259,78 @@
     "name": "google-maps",
     "description": "Google Maps MCP server — geocoding, directions, places, distance matrix",
     "command": "npx -y @modelcontextprotocol/server-google-maps",
-    "tags": ["maps", "geocoding", "location", "google", "places"],
-    "tech_stack": ["any"],
+    "tags": [
+      "maps",
+      "geocoding",
+      "location",
+      "google",
+      "places"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
-    "env_vars": ["GOOGLE_MAPS_API_KEY"]
+    "env_vars": [
+      "GOOGLE_MAPS_API_KEY"
+    ]
   },
   {
     "name": "aws-kb-retrieval",
     "description": "AWS Knowledge Base Retrieval — semantic search over Bedrock knowledge bases",
     "command": "npx -y @modelcontextprotocol/server-aws-kb-retrieval",
-    "tags": ["aws", "bedrock", "rag", "knowledge_base", "semantic_search"],
-    "tech_stack": ["python", "node", "aws"],
+    "tags": [
+      "aws",
+      "bedrock",
+      "rag",
+      "knowledge_base",
+      "semantic_search"
+    ],
+    "tech_stack": [
+      "python",
+      "node",
+      "aws"
+    ],
     "runtime": "stdio",
-    "env_vars": ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION"]
+    "env_vars": [
+      "AWS_ACCESS_KEY_ID",
+      "AWS_SECRET_ACCESS_KEY",
+      "AWS_REGION"
+    ]
   },
   {
     "name": "everart",
     "description": "EverArt AI image generation — create and edit images via AI",
     "command": "npx -y @modelcontextprotocol/server-everart",
-    "tags": ["images", "ai", "generation", "art", "design"],
-    "tech_stack": ["any"],
+    "tags": [
+      "images",
+      "ai",
+      "generation",
+      "art",
+      "design"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
-    "env_vars": ["EVERART_API_KEY"]
+    "env_vars": [
+      "EVERART_API_KEY"
+    ]
   },
   {
     "name": "sequential-thinking",
     "description": "Sequential thinking — structured multi-step reasoning for complex problems",
     "command": "npx -y @modelcontextprotocol/server-sequential-thinking",
-    "tags": ["reasoning", "thinking", "planning", "chain_of_thought", "analysis", "problem_solving"],
-    "tech_stack": ["any"],
+    "tags": [
+      "reasoning",
+      "thinking",
+      "planning",
+      "chain_of_thought",
+      "analysis",
+      "problem_solving"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -156,83 +338,197 @@
     "name": "sentry",
     "description": "Sentry MCP server — query issues, events, performance data",
     "command": "npx -y @sentry/mcp-server",
-    "tags": ["sentry", "monitoring", "errors", "debugging", "observability"],
-    "tech_stack": ["python", "node", "javascript", "typescript", "java", "go"],
+    "tags": [
+      "sentry",
+      "monitoring",
+      "errors",
+      "debugging",
+      "observability"
+    ],
+    "tech_stack": [
+      "python",
+      "node",
+      "javascript",
+      "typescript",
+      "java",
+      "go"
+    ],
     "runtime": "stdio",
-    "env_vars": ["SENTRY_AUTH_TOKEN", "SENTRY_ORG"]
+    "env_vars": [
+      "SENTRY_AUTH_TOKEN",
+      "SENTRY_ORG"
+    ]
   },
   {
     "name": "linear",
     "description": "Linear MCP server — issues, projects, cycles, teams",
     "command": "npx -y @linear/mcp-server",
-    "tags": ["linear", "project_management", "issues", "sprints", "agile"],
-    "tech_stack": ["any"],
+    "tags": [
+      "linear",
+      "project_management",
+      "issues",
+      "sprints",
+      "agile"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
-    "env_vars": ["LINEAR_API_KEY"]
+    "env_vars": [
+      "LINEAR_API_KEY"
+    ]
   },
   {
     "name": "atlassian",
     "description": "Atlassian MCP server — JIRA issues, Confluence pages (72 tools)",
-    "command": "uvx mcp-atlassian",
-    "tags": ["jira", "confluence", "atlassian", "project_management", "wiki", "issues", "tickets"],
-    "tech_stack": ["any"],
+    "command": "uvx --with fastmcp==2.14.5 mcp-atlassian",
+    "tags": [
+      "jira",
+      "confluence",
+      "atlassian",
+      "project_management",
+      "wiki",
+      "issues",
+      "tickets"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
-    "env_vars": ["JIRA_URL", "JIRA_USERNAME", "JIRA_API_TOKEN", "CONFLUENCE_URL"],
+    "env_vars": [
+      "JIRA_URL",
+      "JIRA_USERNAME",
+      "JIRA_API_TOKEN",
+      "CONFLUENCE_URL",
+      "CONFLUENCE_USERNAME",
+      "CONFLUENCE_API_TOKEN"
+    ],
     "estimated_tools": 72
   },
   {
     "name": "hubspot",
     "description": "HubSpot MCP server — contacts, companies, deals, tasks, CRM",
     "command": "npx -y hubspot-mcp-server",
-    "tags": ["hubspot", "crm", "contacts", "deals", "sales", "marketing"],
-    "tech_stack": ["any"],
+    "tags": [
+      "hubspot",
+      "crm",
+      "contacts",
+      "deals",
+      "sales",
+      "marketing"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
-    "env_vars": ["HUBSPOT_ACCESS_TOKEN"],
+    "env_vars": [
+      "HUBSPOT_ACCESS_TOKEN"
+    ],
     "estimated_tools": 30
   },
   {
     "name": "zendesk",
     "description": "Zendesk MCP server — tickets, users, knowledge base, support",
     "command": "uvx zendesk-mcp",
-    "tags": ["zendesk", "support", "tickets", "helpdesk", "customer_service"],
-    "tech_stack": ["any"],
+    "tags": [
+      "zendesk",
+      "support",
+      "tickets",
+      "helpdesk",
+      "customer_service"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
-    "env_vars": ["ZENDESK_SUBDOMAIN", "ZENDESK_EMAIL", "ZENDESK_API_TOKEN"],
+    "env_vars": [
+      "ZENDESK_SUBDOMAIN",
+      "ZENDESK_EMAIL",
+      "ZENDESK_API_TOKEN"
+    ],
     "estimated_tools": 25
   },
   {
     "name": "stripe",
     "description": "Stripe MCP server — payments, customers, subscriptions, invoices",
     "command": "npx -y @stripe/mcp",
-    "tags": ["stripe", "payments", "billing", "subscriptions", "fintech"],
-    "tech_stack": ["any"],
+    "tags": [
+      "stripe",
+      "payments",
+      "billing",
+      "subscriptions",
+      "fintech"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
-    "env_vars": ["STRIPE_SECRET_KEY"]
+    "env_vars": [
+      "STRIPE_SECRET_KEY"
+    ]
   },
   {
     "name": "neo4j",
     "description": "Neo4j MCP server — graph database queries, schema exploration",
     "command": "uvx mcp-neo4j-cypher",
-    "tags": ["neo4j", "graph", "database", "cypher", "knowledge_graph"],
-    "tech_stack": ["python", "node", "java"],
+    "tags": [
+      "neo4j",
+      "graph",
+      "database",
+      "cypher",
+      "knowledge_graph"
+    ],
+    "tech_stack": [
+      "python",
+      "node",
+      "java"
+    ],
     "runtime": "stdio",
-    "env_vars": ["NEO4J_URI", "NEO4J_USERNAME", "NEO4J_PASSWORD"]
+    "env_vars": [
+      "NEO4J_URI",
+      "NEO4J_USERNAME",
+      "NEO4J_PASSWORD"
+    ]
   },
   {
     "name": "redis",
     "description": "Redis MCP server — key/value store operations, pub/sub",
     "command": "npx -y @modelcontextprotocol/server-redis",
-    "tags": ["redis", "cache", "key_value", "pubsub", "queue"],
-    "tech_stack": ["python", "node", "go", "java", "django", "fastapi", "rails"],
+    "tags": [
+      "redis",
+      "cache",
+      "key_value",
+      "pubsub",
+      "queue"
+    ],
+    "tech_stack": [
+      "python",
+      "node",
+      "go",
+      "java",
+      "django",
+      "fastapi",
+      "rails"
+    ],
     "runtime": "stdio",
-    "env_vars": ["REDIS_URL"]
+    "env_vars": [
+      "REDIS_URL"
+    ]
   },
   {
     "name": "terraform",
     "description": "Terraform MCP server — IaC plans, apply, state management",
     "command": "npx -y terraform-mcp-server",
-    "tags": ["terraform", "iac", "infrastructure", "devops", "cloud"],
-    "tech_stack": ["any"],
+    "tags": [
+      "terraform",
+      "iac",
+      "infrastructure",
+      "devops",
+      "cloud"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -240,17 +536,38 @@
     "name": "perplexity",
     "description": "Perplexity AI search — research-grade web search with citations",
     "command": "npx -y server-perplexity-ask",
-    "tags": ["search", "research", "web", "perplexity", "ai"],
-    "tech_stack": ["any"],
+    "tags": [
+      "search",
+      "research",
+      "web",
+      "perplexity",
+      "ai"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
-    "env_vars": ["PERPLEXITY_API_KEY"]
+    "env_vars": [
+      "PERPLEXITY_API_KEY"
+    ]
   },
   {
     "name": "git",
     "description": "Git MCP server — read, search, diff, log, blame local git repositories without needing GitHub/GitLab tokens",
     "command": "uvx mcp-server-git",
-    "tags": ["git", "version_control", "diff", "log", "blame", "commits", "local", "code"],
-    "tech_stack": ["any"],
+    "tags": [
+      "git",
+      "version_control",
+      "diff",
+      "log",
+      "blame",
+      "commits",
+      "local",
+      "code"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -258,8 +575,17 @@
     "name": "time",
     "description": "Time and timezone tools — current time, timezone conversion, date arithmetic",
     "command": "uvx mcp-server-time",
-    "tags": ["time", "timezone", "date", "clock", "scheduling", "conversion"],
-    "tech_stack": ["any"],
+    "tags": [
+      "time",
+      "timezone",
+      "date",
+      "clock",
+      "scheduling",
+      "conversion"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -267,8 +593,17 @@
     "name": "everything",
     "description": "Reference MCP server — demos all MCP features: tools, resources, prompts, sampling",
     "command": "npx -y @modelcontextprotocol/server-everything",
-    "tags": ["reference", "testing", "demo", "mcp", "development", "debugging"],
-    "tech_stack": ["any"],
+    "tags": [
+      "reference",
+      "testing",
+      "demo",
+      "mcp",
+      "development",
+      "debugging"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -276,8 +611,17 @@
     "name": "wikipedia",
     "description": "Wikipedia MCP server — search and retrieve Wikipedia articles, free public API",
     "command": "uvx mcp-server-wikipedia",
-    "tags": ["wikipedia", "research", "knowledge", "encyclopedia", "facts", "reference"],
-    "tech_stack": ["any"],
+    "tags": [
+      "wikipedia",
+      "research",
+      "knowledge",
+      "encyclopedia",
+      "facts",
+      "reference"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -285,8 +629,19 @@
     "name": "arxiv",
     "description": "arXiv MCP server — search and retrieve academic papers from arXiv, free public API",
     "command": "uvx arxiv-mcp-server",
-    "tags": ["arxiv", "research", "papers", "academic", "science", "ml", "ai", "physics"],
-    "tech_stack": ["any"],
+    "tags": [
+      "arxiv",
+      "research",
+      "papers",
+      "academic",
+      "science",
+      "ml",
+      "ai",
+      "physics"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -294,8 +649,17 @@
     "name": "open-meteo-weather",
     "description": "Open-Meteo weather — free weather forecasts and historical data, no API key required",
     "command": "uvx mcp-server-openmeteo",
-    "tags": ["weather", "forecast", "temperature", "climate", "location", "free"],
-    "tech_stack": ["any"],
+    "tags": [
+      "weather",
+      "forecast",
+      "temperature",
+      "climate",
+      "location",
+      "free"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -303,8 +667,17 @@
     "name": "searxng",
     "description": "SearXNG web search — privacy-respecting meta-search engine, self-hosted or public instances",
     "command": "uvx mcp-server-searxng",
-    "tags": ["search", "web", "privacy", "meta_search", "research", "news"],
-    "tech_stack": ["any"],
+    "tags": [
+      "search",
+      "web",
+      "privacy",
+      "meta_search",
+      "research",
+      "news"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -312,8 +685,18 @@
     "name": "obsidian",
     "description": "Obsidian vault MCP server — read, search, write notes in a local Obsidian vault",
     "command": "npx -y mcp-obsidian",
-    "tags": ["obsidian", "notes", "markdown", "knowledge_base", "zettelkasten", "writing", "local"],
-    "tech_stack": ["any"],
+    "tags": [
+      "obsidian",
+      "notes",
+      "markdown",
+      "knowledge_base",
+      "zettelkasten",
+      "writing",
+      "local"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -321,8 +704,19 @@
     "name": "pandoc",
     "description": "Pandoc document conversion — convert between Markdown, HTML, PDF, DOCX and more",
     "command": "uvx mcp-pandoc",
-    "tags": ["pandoc", "documents", "conversion", "markdown", "pdf", "docx", "html", "writing"],
-    "tech_stack": ["any"],
+    "tags": [
+      "pandoc",
+      "documents",
+      "conversion",
+      "markdown",
+      "pdf",
+      "docx",
+      "html",
+      "writing"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -330,8 +724,17 @@
     "name": "everything-search",
     "description": "Fast local file search — cross-platform file system search (Windows/macOS/Linux)",
     "command": "uvx mcp-everything-search",
-    "tags": ["search", "files", "filesystem", "local", "find", "index"],
-    "tech_stack": ["any"],
+    "tags": [
+      "search",
+      "files",
+      "filesystem",
+      "local",
+      "find",
+      "index"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -339,8 +742,21 @@
     "name": "playwright",
     "description": "Playwright browser automation — navigate pages, capture screenshots, scrape content, run E2E tests",
     "command": "npx -y @playwright/mcp",
-    "tags": ["playwright", "browser", "automation", "testing", "e2e", "screenshot", "scraping"],
-    "tech_stack": ["javascript", "typescript", "node", "python"],
+    "tags": [
+      "playwright",
+      "browser",
+      "automation",
+      "testing",
+      "e2e",
+      "screenshot",
+      "scraping"
+    ],
+    "tech_stack": [
+      "javascript",
+      "typescript",
+      "node",
+      "python"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -348,8 +764,18 @@
     "name": "mcp-local-rag",
     "description": "Local RAG search — semantic search over local documents using DuckDuckGo and local embeddings, no external API needed",
     "command": "uvx mcp-local-rag",
-    "tags": ["rag", "search", "embeddings", "local", "documents", "semantic_search", "offline"],
-    "tech_stack": ["any"],
+    "tags": [
+      "rag",
+      "search",
+      "embeddings",
+      "local",
+      "documents",
+      "semantic_search",
+      "offline"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -357,8 +783,19 @@
     "name": "markdownify",
     "description": "Markdownify — convert PPTX, HTML, PDF, YouTube transcripts and more to clean Markdown",
     "command": "uvx markdownify-mcp",
-    "tags": ["markdown", "conversion", "pdf", "pptx", "html", "youtube", "documents", "writing"],
-    "tech_stack": ["any"],
+    "tags": [
+      "markdown",
+      "conversion",
+      "pdf",
+      "pptx",
+      "html",
+      "youtube",
+      "documents",
+      "writing"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -366,8 +803,18 @@
     "name": "pubmed",
     "description": "PubMed MCP server — search and access biomedical research articles from PubMed, free public API",
     "command": "uvx mcp-server-pubmed",
-    "tags": ["pubmed", "research", "biomedical", "papers", "academic", "health", "science"],
-    "tech_stack": ["any"],
+    "tags": [
+      "pubmed",
+      "research",
+      "biomedical",
+      "papers",
+      "academic",
+      "health",
+      "science"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -375,8 +822,18 @@
     "name": "quickchart",
     "description": "QuickChart — generate charts and graphs from data using QuickChart.io, free tier available",
     "command": "uvx mcp-quickchart",
-    "tags": ["charts", "graphs", "visualization", "data", "reporting", "png", "svg"],
-    "tech_stack": ["any"],
+    "tags": [
+      "charts",
+      "graphs",
+      "visualization",
+      "data",
+      "reporting",
+      "png",
+      "svg"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -384,8 +841,18 @@
     "name": "vega-lite",
     "description": "Vega-Lite visualizations — generate data visualizations from fetched data using Vega-Lite",
     "command": "npx -y @modelcontextprotocol/server-vega-lite",
-    "tags": ["visualization", "charts", "graphs", "data", "vega", "analytics", "reporting"],
-    "tech_stack": ["any"],
+    "tags": [
+      "visualization",
+      "charts",
+      "graphs",
+      "data",
+      "vega",
+      "analytics",
+      "reporting"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -393,8 +860,18 @@
     "name": "mcp-grep",
     "description": "Grep MCP server — regex pattern search across files and directories",
     "command": "uvx mcp-grep",
-    "tags": ["grep", "search", "regex", "files", "code", "text", "find"],
-    "tech_stack": ["any"],
+    "tags": [
+      "grep",
+      "search",
+      "regex",
+      "files",
+      "code",
+      "text",
+      "find"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
     "env_vars": []
   },
@@ -402,8 +879,19 @@
     "name": "desktop-commander",
     "description": "DesktopCommander — file management, terminal commands, SSH connections on local machine",
     "command": "npx -y @wonderwhy-er/desktop-commander",
-    "tags": ["terminal", "shell", "commands", "files", "ssh", "local", "automation", "devops"],
-    "tech_stack": ["any"],
+    "tags": [
+      "terminal",
+      "shell",
+      "commands",
+      "files",
+      "ssh",
+      "local",
+      "automation",
+      "devops"
+    ],
+    "tech_stack": [
+      "any"
+    ],
     "runtime": "stdio",
     "env_vars": []
   }

@@ -137,6 +137,32 @@ def _do_mount(entry: ProxyEntry) -> tuple[bool, str]:
         mcp_config = _mcp_config_for_entry(entry)
         client = Client(mcp_config)
         proxy = create_proxy(client)
+        
+        # Wrap proxy.call_tool to add auditing for child tool calls
+        original_call = proxy.call_tool
+        
+        async def audited_call(name: str, arguments: dict | None = None) -> Any:
+            start_time = time.monotonic()
+            outcome = "ok"
+            try:
+                # Use namespaced name for auditing
+                # The name passed here might already be namespaced if called via mcp.mount
+                result = await original_call(name, arguments)
+                return result
+            except Exception as e:
+                outcome = f"error: {str(e)}"
+                raise
+            finally:
+                latency = (time.monotonic() - start_time) * 1000
+                audit(
+                    tool=f"{entry.name}_{name}" if not name.startswith(f"{entry.name}_") else name,
+                    outcome=outcome,
+                    latency_ms=latency,
+                    extra={"args": list(arguments.keys()) if arguments else []}
+                )
+                
+        proxy.call_tool = audited_call
+        
         mcp.mount(proxy, namespace=entry.name)
 
         with _lock:
@@ -153,11 +179,11 @@ def _do_unmount(name: str) -> tuple[bool, str]:
     with _lock:
         if name not in _active_servers:
             return False, f"'{name}' is not mounted."
+        
         _active_servers.pop(name)
-
-    # Remove the matching _WrappedProvider from FastMCP's providers list.
-    # Mounted servers appear as _WrappedProvider with a Namespace transform
-    # whose ._prefix equals the namespace string used at mount time.
+        
+    # fastmcp doesn't have a public unmount API yet
+    # We remove it from providers map directly
     mcp.providers[:] = [
         p for p in mcp.providers
         if not (
@@ -179,13 +205,14 @@ def _resolve_catalogue_entry(name: str) -> Optional[CatalogueEntry]:
 def _catalogue_entry_to_proxy(cat: CatalogueEntry) -> Optional[ProxyEntry]:
     """Convert a CatalogueEntry to a ProxyEntry for mounting."""
     if cat.url:
-        return ProxyEntry(name=cat.name, url=cat.url, tags=cat.tags, runtime=cat.runtime)
+        return ProxyEntry(name=cat.name, url=cat.url, tags=cat.tags, runtime=cat.runtime, env_vars=cat.env_vars)
     if cat.command:
         return ProxyEntry(
             name=cat.name,
             url=f"stdio://{cat.command}",
             tags=cat.tags,
             runtime="stdio",
+            env_vars=cat.env_vars
         )
     return None
 
@@ -200,7 +227,15 @@ def _mcp_config_for_entry(entry: ProxyEntry) -> dict:
     # Expand environment variables like $VAR or ${VAR}
     command_str = os.path.expandvars(command_str)
     parts = shlex.split(command_str)
-    return {"mcpServers": {entry.name: {"command": parts[0], "args": parts[1:]}}}
+    
+    server_conf: dict[str, Any] = {"command": parts[0], "args": parts[1:]}
+    # Pass along requested environment variables from proxy's environment
+    if entry.env_vars:
+        filtered_env = {k: os.environ[k] for k in entry.env_vars if k in os.environ}
+        if filtered_env:
+            server_conf["env"] = filtered_env
+
+    return {"mcpServers": {entry.name: server_conf}}
 
 
 def _uptime_seconds() -> float:
@@ -448,34 +483,42 @@ def proxy_list_available_servers(filter_tag: str = "") -> str:
 @mcp.tool(name="proxy_list_tools")
 async def proxy_list_tools(server_name: Optional[str] = None) -> str:
     """
-    List exactly what tools are available and their full names.
-    Useful for discovering the correct prefix or naming convention for mounted servers.
-
-    Args:
-        server_name: Optional name of the mounted server to filter tools by (e.g., "atlassian")
+    List all available tools and their exact names, including any prefixes.
+    If server_name is provided, filters for tools from that child server.
     """
     try:
         tools = await mcp.list_tools()
+        results = []
+        for t in tools:
+            # Exclude proxy_* tools to keep the list focused on child servers
+            if not t.name.startswith("proxy_"):
+                if server_name is None or t.name.startswith(f"{server_name}_"):
+                    results.append({"name": t.name, "description": t.description})
+        
+        return json.dumps({
+            "tools": results,
+            "total": len(results),
+            "note": "Use these exact 'name' values when making tool calls."
+        }, indent=2)
     except Exception as exc:
         return json.dumps({"ok": False, "error": f"Failed to list tools: {exc}"})
-        
-    tool_list = []
-    for t in tools:
-        if t.name.startswith("proxy_"):
-            continue
-            
-        if server_name and not t.name.startswith(f"{server_name}_"):
-            continue
-            
-        tool_list.append({
-            "name": t.name,
-            "description": t.description
-        })
 
+
+@mcp.tool(name="proxy_inspect_registry")
+async def proxy_inspect_registry() -> str:
+    """
+    Diagnostic tool: Expose the RAW internal tool list and proxy state.
+    Includes counts of active servers and total tools, plus ANY registered tool.
+    """
+    all_tools = await mcp.list_tools()
+    
     return json.dumps({
-        "tools": tool_list,
-        "total": len(tool_list),
-        "note": "Use these exact 'name' values when making tool calls."
+        "status": "ok",
+        "active_servers": list(_active_servers.keys()),
+        "total_tools": len(all_tools),
+        "registry": [{"name": t.name, "description": t.description[:100]} for t in all_tools],
+        "tool_budget": _config.tool_budget,
+        "budget_remaining": _config.tool_budget - len(all_tools)
     }, indent=2)
 
 
