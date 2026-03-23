@@ -273,3 +273,106 @@ class TestLRUEviction:
         assert len(evicted) >= 1
         # server1 is LRU (inserted first)
         assert "server1" in evicted
+
+
+class TestProxyListTools:
+    """Tests for the async proxy_list_tools tool."""
+
+    def setup_method(self):
+        _reset_proxy_state()
+        proxy_server._startup()
+
+    def _run(self, coro):
+        import asyncio
+        return asyncio.run(coro)
+
+    def test_list_tools_returns_valid_json(self):
+        """proxy_list_tools must always return parseable JSON."""
+        raw = self._run(proxy_server.proxy_list_tools())
+        data = json.loads(raw)
+        assert "tools" in data
+        assert "total" in data
+        assert "note" in data
+
+    def test_list_tools_excludes_proxy_tools(self):
+        """proxy_list_tools must not include the proxy_* management tools themselves."""
+        raw = self._run(proxy_server.proxy_list_tools())
+        data = json.loads(raw)
+        for tool in data["tools"]:
+            assert not tool["name"].startswith("proxy_"), (
+                f"proxy_* tool '{tool['name']}' should be excluded from the list"
+            )
+
+    def test_list_tools_total_matches_list_length(self):
+        """The 'total' field must match the actual number of tools returned."""
+        raw = self._run(proxy_server.proxy_list_tools())
+        data = json.loads(raw)
+        assert data["total"] == len(data["tools"])
+
+    def test_list_tools_filter_by_server_name(self, monkeypatch):
+        """Filtering by server_name should only return tools with that prefix."""
+        # Simulate a mounted server by injecting a fake provider via monkeypatch
+        from unittest.mock import AsyncMock, MagicMock
+        import asyncio
+
+        fake_tool_github = MagicMock()
+        fake_tool_github.name = "github_list-repos"
+        fake_tool_github.description = "List GitHub repos"
+
+        fake_tool_postgres = MagicMock()
+        fake_tool_postgres.name = "postgres_query"
+        fake_tool_postgres.description = "Run a Postgres query"
+
+        async def fake_list_tools():
+            return [fake_tool_github, fake_tool_postgres]
+
+        monkeypatch.setattr(proxy_server.mcp, "list_tools", fake_list_tools)
+
+        raw = self._run(proxy_server.proxy_list_tools(server_name="github"))
+        data = json.loads(raw)
+        assert data["total"] == 1
+        assert data["tools"][0]["name"] == "github_list-repos"
+
+    def test_list_tools_no_filter_returns_all_non_proxy_tools(self, monkeypatch):
+        """With no filter, all non-proxy_ tools from all servers are returned."""
+        from unittest.mock import MagicMock
+
+        fake_tools = [
+            MagicMock(name="github_issues", description="GitHub issues"),
+            MagicMock(name="postgres_query", description="Postgres query"),
+        ]
+        # MagicMock autogenerates .name from the name kwarg — we must set as attribute
+        for t in fake_tools:
+            t.name = t._mock_name  # Sync the name attribute correctly
+
+        # Build manually since MagicMock name kwarg is special
+        t1 = MagicMock()
+        t1.name = "github_issues"
+        t1.description = "GitHub issues"
+        t2 = MagicMock()
+        t2.name = "postgres_query"
+        t2.description = "Postgres query"
+
+        async def fake_list_tools():
+            return [t1, t2]
+
+        monkeypatch.setattr(proxy_server.mcp, "list_tools", fake_list_tools)
+
+        raw = self._run(proxy_server.proxy_list_tools())
+        data = json.loads(raw)
+        names = [t["name"] for t in data["tools"]]
+        assert "github_issues" in names
+        assert "postgres_query" in names
+        assert data["total"] == 2
+
+    def test_list_tools_handles_exception_gracefully(self, monkeypatch):
+        """If mcp.list_tools() raises, the tool must return JSON with ok=False."""
+        async def exploding_list_tools():
+            raise RuntimeError("Simulated failure")
+
+        monkeypatch.setattr(proxy_server.mcp, "list_tools", exploding_list_tools)
+
+        raw = self._run(proxy_server.proxy_list_tools())
+        data = json.loads(raw)
+        assert data["ok"] is False
+        assert "error" in data

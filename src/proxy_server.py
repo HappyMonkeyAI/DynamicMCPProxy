@@ -197,6 +197,8 @@ def _mcp_config_for_entry(entry: ProxyEntry) -> dict:
     # stdio — strip the "stdio://" prefix and split into command + args
     # shlex.split handles paths/args with spaces correctly
     command_str = entry.url.removeprefix("stdio://")
+    # Expand environment variables like $VAR or ${VAR}
+    command_str = os.path.expandvars(command_str)
     parts = shlex.split(command_str)
     return {"mcpServers": {entry.name: {"command": parts[0], "args": parts[1:]}}}
 
@@ -440,6 +442,40 @@ def proxy_list_available_servers(filter_tag: str = "") -> str:
             for c in available
         ],
         "count": len(available),
+    }, indent=2)
+
+
+@mcp.tool(name="proxy_list_tools")
+async def proxy_list_tools(server_name: Optional[str] = None) -> str:
+    """
+    List exactly what tools are available and their full names.
+    Useful for discovering the correct prefix or naming convention for mounted servers.
+
+    Args:
+        server_name: Optional name of the mounted server to filter tools by (e.g., "atlassian")
+    """
+    try:
+        tools = await mcp.list_tools()
+    except Exception as exc:
+        return json.dumps({"ok": False, "error": f"Failed to list tools: {exc}"})
+        
+    tool_list = []
+    for t in tools:
+        if t.name.startswith("proxy_"):
+            continue
+            
+        if server_name and not t.name.startswith(f"{server_name}_"):
+            continue
+            
+        tool_list.append({
+            "name": t.name,
+            "description": t.description
+        })
+
+    return json.dumps({
+        "tools": tool_list,
+        "total": len(tool_list),
+        "note": "Use these exact 'name' values when making tool calls."
     }, indent=2)
 
 
