@@ -379,33 +379,6 @@
     ]
   },
   {
-    "name": "atlassian",
-    "description": "Atlassian MCP server — JIRA issues, Confluence pages (72 tools)",
-    "command": "uvx --with fastmcp==2.14.5 mcp-atlassian",
-    "tags": [
-      "jira",
-      "confluence",
-      "atlassian",
-      "project_management",
-      "wiki",
-      "issues",
-      "tickets"
-    ],
-    "tech_stack": [
-      "any"
-    ],
-    "runtime": "stdio",
-    "env_vars": [
-      "JIRA_URL",
-      "JIRA_USERNAME",
-      "JIRA_API_TOKEN",
-      "CONFLUENCE_URL",
-      "CONFLUENCE_USERNAME",
-      "CONFLUENCE_API_TOKEN"
-    ],
-    "estimated_tools": 72
-  },
-  {
     "name": "hubspot",
     "description": "HubSpot MCP server — contacts, companies, deals, tasks, CRM",
     "command": "npx -y hubspot-mcp-server",
