@@ -12,7 +12,7 @@ from src.config import (
 
 def test_load_config_defaults(tmp_path: Path):
     cfg = load_config(tmp_path / "nonexistent.json")
-    assert cfg.tool_budget == 50
+    assert cfg.tool_budget == 100
     assert cfg.auth_enabled is False
     assert cfg.guardrails_enabled is True
     assert cfg.proxies == []

@@ -867,5 +867,29 @@
     ],
     "runtime": "stdio",
     "env_vars": []
+  },
+  {
+    "name": "agent-factory",
+    "description": "Transform AI CLI tools into AI-powered agents via MCP. Supports Claude Code, Gemini, OpenCode, Aider, and more.",
+    "command": "npx -y agent-factory-mcp",
+    "tags": [
+      "agent",
+      "factory",
+      "claude",
+      "gemini",
+      "aider",
+      "opencode",
+      "cli"
+    ],
+    "tech_stack": [
+      "any"
+    ],
+    "runtime": "stdio",
+    "env_vars": [
+      "ANTHROPIC_API_KEY",
+      "GOOGLE_GENERATIVE_AI_API_KEY",
+      "OPENAI_API_KEY",
+      "OPENCODE_API_KEY"
+    ]
   }
 ]
