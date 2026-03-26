@@ -1,6 +1,6 @@
 # Dynamic MCP Proxy
 
-A smart MCP proxy server that lazily loads relevant MCP tool servers based on your project context, keeping AI tool counts within recommended limits (≤ 50 tools for Google Antigravity).
+A smart MCP proxy server that lazily loads relevant MCP tool servers based on your project context, keeping AI tool counts within recommended limits (≤ 50 tools for Google Antigravity). Designed specifically for high-autonomy environments where agents need to evolve their own toolsets.
 
 Part of the [Anti-Gravity Agents Prompt Protocol](https://github.com/SPhillips1337/AntigravityAgentsPromptProtocol) ecosystem.
 
@@ -158,6 +158,15 @@ When `auth_enabled = true`:
 ## Hot-Plug Plugins
 
 Drop any executable MCP server script into `./plugins/`. The proxy detects it via watchdog and registers it live — no restart needed.
+
+## Autonomous Tooling & Hot-Swap
+
+The real power of this proxy lies in **Runtime Mutation**. Unlike static MCP configurations, this proxy allows an agent to "evolve" its toolbox as the task progresses:
+
+1.  **Just-in-Time Activation**: A2A (Agent-to-Agent) workflows that run for hours can activate `sequential-thinking` only when hitting a complex logic gate, then swap it for `docker` or `terraform` during the execution phase.
+2.  **Autonomous Bootstrap**: An agent can research a new tool, configure its environment via `proxy_add_custom_proxy`, and begin using it immediately without human intervention.
+3.  **Self-Correction**: If a tool is missing, an agent can literally write a new MCP server to `./plugins/` and the proxy will hot-plug it instantly.
+4.  **Token Sustainability**: By keeping the active toolset lean (via LRU eviction), long-running agents avoid context-window saturation and maintain peak focus on the task.
 
 ## Update the Public Catalogue
 
