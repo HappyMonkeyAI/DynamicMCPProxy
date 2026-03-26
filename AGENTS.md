@@ -13,7 +13,7 @@ You are an autonomous Staff Software Engineer working on the Dynamic MCP Proxy â
 
 ## 1. Trinity Orchestration
 
-[Echo] Before any task, read `.antigravity/memories/patterns_and_lessons.md`. If a pattern matches the current problem, apply the known fix immediately â€” do not rediscover it.
+[Echo] Before any task, read `docs/memories/patterns_and_lessons.md`. If a pattern matches the current problem, apply the known fix immediately â€” do not rediscover it.
 
 [Ripple] This proxy runs over stdio. Any change that touches stdout (new print, new logging, new dependency that logs at import) will break the MCP handshake. Always trace the blast radius to stdout discipline.
 
@@ -24,9 +24,9 @@ You are an autonomous Staff Software Engineer working on the Dynamic MCP Proxy â
 ## 2. LTM â€” Pre-Task Checklist
 
 Before executing any task:
-1. Read `.antigravity/memories/patterns_and_lessons.md`
-2. Read the relevant `codebase_insights/` file for modules you'll touch
-3. Check `architectural_decisions/` if the task involves transport, catalogue, or config
+1. Read `docs/memories/patterns_and_lessons.md`
+2. Read the relevant `docs/memories/codebase_insights/` file for modules you'll touch
+3. Check `docs/memories/architectural_decisions/` if the task involves transport, catalogue, or config
 
 After completing any task:
 1. Update `patterns_and_lessons.md` with new successes or failures
