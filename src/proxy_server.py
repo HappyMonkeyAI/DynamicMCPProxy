@@ -76,6 +76,10 @@ _catalogue: list[CatalogueEntry] = []
 _active_servers: OrderedDict[str, tuple[ProxyEntry, Any, int]] = OrderedDict()
 _lock = threading.Lock()
 
+# Pending (deferred) servers: registered but not yet materialised.
+# key = server name, value = CatalogueEntry or ProxyEntry
+_pending_servers: dict[str, Any] = {}
+
 # FastMCP main server
 mcp = FastMCP(
     name="Dynamic MCP Proxy",
@@ -92,8 +96,9 @@ mcp = FastMCP(
 # ---------------------------------------------------------------------------
 
 def _tool_count() -> int:
+    """Total tool slots consumed: active real tools + 1 stub per pending server."""
     with _lock:
-        return sum(tc for _, _, tc in _active_servers.values())
+        return sum(tc for _, _, tc in _active_servers.values()) + len(_pending_servers)
 
 
 def _evict_lru_if_needed(needed: int = 0) -> None:
@@ -124,7 +129,7 @@ def _estimate_tool_count(entry: ProxyEntry) -> int:
 
 def _do_mount(entry: ProxyEntry) -> tuple[bool, str]:
     """
-    Mount a single ProxyEntry as a child server.
+    Mount a single ProxyEntry as a child server (materialize immediately).
     Returns (success, message).
     """
     if entry.name in _active_servers:
@@ -145,8 +150,6 @@ def _do_mount(entry: ProxyEntry) -> tuple[bool, str]:
             start_time = time.monotonic()
             outcome = "ok"
             try:
-                # Use namespaced name for auditing
-                # The name passed here might already be namespaced if called via mcp.mount
                 result = await original_call(name, arguments)
                 return result
             except Exception as e:
@@ -174,13 +177,107 @@ def _do_mount(entry: ProxyEntry) -> tuple[bool, str]:
         return False, f"Failed to mount '{entry.name}': {exc}"
 
 
+def _remove_stub_tool(name: str) -> None:
+    """Remove the {name}_load stub tool from the FastMCP registry."""
+    stub_name = f"{name}_load"
+    # FastMCP stores directly-registered tools in mcp._tool_manager._tools
+    try:
+        tools = mcp._tool_manager._tools  # type: ignore[attr-defined]
+        tools.pop(stub_name, None)
+    except AttributeError:
+        pass  # API surface may differ across FastMCP versions — safe to swallow
+
+
+def _register_pending(entry: Any) -> tuple[bool, str]:
+    """
+    Register a server as a deferred (pending) entry.
+    Exposes a single lightweight `{name}_load` stub tool instead of mounting the
+    full server immediately. The real subprocess is only spawned when the stub
+    (or any tool on that server) is first invoked.
+
+    `entry` may be a CatalogueEntry or a ProxyEntry.
+    Returns (success, message).
+    """
+    name = entry.name
+
+    if name in _active_servers:
+        return False, f"'{name}' is already fully mounted."
+    if name in _pending_servers:
+        return False, f"'{name}' is already pending."
+
+    with _lock:
+        _pending_servers[name] = entry
+
+    # Register the stub tool dynamically.
+    # We capture `name` in the closure via a default argument.
+    stub_description = (
+        f"Load the '{name}' MCP server and make its tools available. "
+        f"Call this before using any {name}_* tools, or simply call any "
+        f"{name}_* tool directly — the server will be loaded automatically."
+    )
+
+    def _make_stub(server_name: str):
+        def stub() -> str:
+            return _materialise(server_name)
+        stub.__name__ = f"{server_name}_load"
+        stub.__doc__ = stub_description
+        return stub
+
+    stub_fn = _make_stub(name)
+    mcp.tool(name=f"{name}_load", description=stub_description)(stub_fn)
+
+    estimated = getattr(entry, "estimated_tools", 10)
+    sys.stderr.write(f"[proxy] Deferred '{name}' ({estimated} tools est.) — stub registered.\n")
+    return True, f"Deferred '{name}' — call '{name}_load' to materialise ({estimated} tools estimated)."
+
+
+def _materialise(name: str) -> str:
+    """
+    Materialise a pending server: remove its stub, spawn the subprocess,
+    mount the real tools, and return a status message.
+    Called automatically when the {name}_load stub is invoked.
+    """
+    with _lock:
+        entry = _pending_servers.pop(name, None)
+
+    if entry is None:
+        if name in _active_servers:
+            return json.dumps({"ok": True, "message": f"'{name}' is already fully loaded."})
+        return json.dumps({"ok": False, "error": f"No pending server named '{name}'."})
+
+    # Remove the stub tool first to free the slot before counting budget
+    _remove_stub_tool(name)
+
+    # Convert CatalogueEntry → ProxyEntry if needed
+    if hasattr(entry, "command") or hasattr(entry, "url") and not hasattr(entry, "active"):
+        # It's a CatalogueEntry
+        proxy_entry = _catalogue_entry_to_proxy(entry)
+        if proxy_entry is None:
+            return json.dumps({"ok": False, "error": f"Cannot build ProxyEntry for '{name}'."})
+    else:
+        proxy_entry = entry
+
+    ok, msg = _do_mount(proxy_entry)
+    sys.stderr.write(f"[proxy] Materialised '{name}': {msg}\n")
+    audit(tool=f"{name}_load", outcome="ok" if ok else "error", latency_ms=0)
+    return json.dumps({"ok": ok, "message": msg, "active_tool_count": _tool_count()})
+
+
 def _do_unmount(name: str) -> tuple[bool, str]:
-    """Unmount a child server by name. Returns (success, message)."""
+    """Unmount a child server by name (active or pending). Returns (success, message)."""
+    # Handle pending (deferred) servers
+    with _lock:
+        if name in _pending_servers:
+            _pending_servers.pop(name)
+    _remove_stub_tool(name)
+
     with _lock:
         if name not in _active_servers:
-            return False, f"'{name}' is not mounted."
-        
-        _active_servers.pop(name)
+            # May have been pending only — that's fine
+            if name not in _active_servers:
+                return True, f"Cleared pending entry '{name}'."
+
+        _active_servers.pop(name, None)
         
     # fastmcp doesn't have a public unmount API yet
     # We remove it from providers map directly
@@ -392,20 +489,23 @@ def proxy_handshake(
     skipped: list[str] = []
 
     for r in ranked:
-        entry = _catalogue_entry_to_proxy(r.entry)
-        if entry is None:
-            continue
-        # Already-active: move to end of LRU so it isn't evicted prematurely
-        if r.entry.name in _active_servers:
+        name = r.entry.name
+        # Already fully active: bump LRU order
+        if name in _active_servers:
             with _lock:
-                _active_servers.move_to_end(r.entry.name)
-            activated.append(r.entry.name)
+                _active_servers.move_to_end(name)
+            activated.append(name)
             continue
-        ok, msg = _do_mount(entry)
+        # Already pending: re-use existing stub
+        if name in _pending_servers:
+            activated.append(name)
+            continue
+        # Register as deferred (creates the {name}_load stub)
+        ok, msg = _register_pending(r.entry)
         if ok:
-            activated.append(r.entry.name)
+            activated.append(name)
         else:
-            skipped.append(f"{r.entry.name}: {msg}")
+            skipped.append(f"{name}: {msg}")
 
     latency = float(round((time.monotonic() - t0) * 1000, 1))
 
@@ -435,14 +535,30 @@ def proxy_handshake(
 @mcp.tool(name="proxy_list_active_servers")
 def proxy_list_active_servers() -> str:
     """List all currently mounted MCP servers and their estimated tool counts."""
-    if not _active_servers:
-        return json.dumps({"active_servers": [], "total_tools": 0})
-
     with _lock:
-        servers = [
-            {"name": name, "url": entry.url, "tags": entry.tags, "estimated_tools": tc}
+        active = [
+            {
+                "name": name,
+                "url": entry.url,
+                "tags": entry.tags,
+                "estimated_tools": tc,
+                "status": "active",
+            }
             for name, (entry, _, tc) in _active_servers.items()
         ]
+        pending = [
+            {
+                "name": name,
+                "tags": getattr(entry, "tags", []),
+                "estimated_tools": getattr(entry, "estimated_tools", 10),
+                "status": "pending",
+                "note": f"Call '{name}_load' to materialise full tool set.",
+            }
+            for name, entry in _pending_servers.items()
+        ]
+    servers = active + pending
+    if not servers:
+        return json.dumps({"active_servers": [], "total_tools": 0})
     return json.dumps({
         "active_servers": servers,
         "total_tools": _tool_count(),
@@ -523,12 +639,16 @@ async def proxy_inspect_registry() -> str:
 
 
 @mcp.tool(name="proxy_activate_server")
-def proxy_activate_server(name: str) -> str:
+def proxy_activate_server(name: str, eager: bool = False) -> str:
     """
     Activate (mount) a server from the catalogue by name.
 
+    By default the server is registered as a deferred stub (`{name}_load` tool)
+    and only fully spawned when first used. Pass eager=True to mount immediately.
+
     Args:
         name: Server name as shown in proxy.list_available_servers()
+        eager: If True, spawn the subprocess immediately instead of deferring.
     """
     if _config.guardrails_enabled and not check_rate_limit("anonymous"):
         return json.dumps({"ok": False, "error": "Rate limit exceeded. Try again later."})
@@ -536,17 +656,20 @@ def proxy_activate_server(name: str) -> str:
     t0 = time.monotonic()
     cat = _resolve_catalogue_entry(name)
     if cat is None:
-        # Try persisted custom proxies
+        # Try persisted custom proxies — always mount eagerly (no catalogue metadata)
         entry = next((p for p in _config.proxies if p.name == name), None)
         if entry is None:
             return json.dumps({"ok": False, "error": f"No server named '{name}' found."})
-    else:
+        ok, msg = _do_mount(entry)
+    elif eager:
         entry = _catalogue_entry_to_proxy(cat)
+        ok, msg = _do_mount(entry)
+    else:
+        ok, msg = _register_pending(cat)
 
-    ok, msg = _do_mount(entry)
     audit(tool="proxy_activate_server", outcome="ok" if ok else "error",
           latency_ms=float(round((time.monotonic() - t0) * 1000, 1)),
-          extra={"server": name})
+          extra={"server": name, "eager": eager})
 
     result = json.dumps({"ok": ok, "message": msg, "active_tool_count": _tool_count()})
     if _config.guardrails_enabled:
@@ -557,7 +680,7 @@ def proxy_activate_server(name: str) -> str:
 @mcp.tool(name="proxy_deactivate_server")
 def proxy_deactivate_server(name: str) -> str:
     """
-    Deactivate (unmount) a currently loaded server to free up tool budget.
+    Deactivate (unmount) a currently loaded or pending server to free up tool budget.
 
     Args:
         name: Server name as shown in proxy.list_active_servers()
@@ -566,6 +689,12 @@ def proxy_deactivate_server(name: str) -> str:
         return json.dumps({"ok": False, "error": "Rate limit exceeded. Try again later."})
 
     t0 = time.monotonic()
+
+    # Check both active and pending before deciding outcome
+    is_known = name in _active_servers or name in _pending_servers
+    if not is_known:
+        return json.dumps({"ok": False, "error": f"'{name}' is not active or pending."})
+
     ok, msg = _do_unmount(name)
     audit(tool="proxy_deactivate_server", outcome="ok" if ok else "error",
           latency_ms=float(round((time.monotonic() - t0) * 1000, 1)),

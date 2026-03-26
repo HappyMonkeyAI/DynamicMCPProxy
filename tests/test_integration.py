@@ -32,6 +32,7 @@ from src.config import CatalogueEntry, ProxyEntry
 def _reset_proxy_state() -> None:
     """Reset proxy global state between tests."""
     proxy_server._active_servers.clear()
+    proxy_server._pending_servers.clear()
     proxy_server._config = proxy_server.AppConfig()
     proxy_server._catalogue = []
 
@@ -443,3 +444,133 @@ class TestDiagnostics:
         data = json.loads(raw)
         assert data["ok"] is False
         assert "error" in data
+
+
+class TestDeferredLoading:
+    """Tests for two-phase deferred (lazy) tool loading."""
+
+    def setup_method(self):
+        _reset_proxy_state()
+        proxy_server._startup()
+        proxy_server._pending_servers.clear()
+
+    def _make_cat(self, name: str) -> "CatalogueEntry":
+        return CatalogueEntry(
+            name=name,
+            description=f"Mock {name}",
+            url=f"http://localhost:9999/{name}/sse",
+            tags=[name],
+            runtime="sse",
+            estimated_tools=8,
+        )
+
+    # ------------------------------------------------------------------
+    # 1. Handshake registers pending, not active
+    # ------------------------------------------------------------------
+
+    def test_handshake_registers_pending_not_mounted(self, monkeypatch):
+        """proxy_handshake should populate _pending_servers, not _active_servers."""
+        cat = self._make_cat("github")
+        proxy_server._catalogue.append(cat)
+
+        # Prevent _do_mount from being called — the test verifies it is NOT called
+        mount_calls = {"n": 0}
+
+        def fail_if_mounted(entry):
+            mount_calls["n"] += 1
+            return True, "should-not-be-called"
+
+        monkeypatch.setattr(proxy_server, "_do_mount", fail_if_mounted)
+
+        raw = proxy_server.proxy_handshake(
+            tech_stack=["github"],
+            task_description="Manage GitHub issues",
+        )
+        data = json.loads(raw)
+
+        assert "github" in data["activated_servers"]
+        assert "github" in proxy_server._pending_servers, "Server should be pending"
+        assert "github" not in proxy_server._active_servers, "Server must NOT be eagerly mounted"
+        assert mount_calls["n"] == 0, "_do_mount must not be called during handshake"
+
+    # ------------------------------------------------------------------
+    # 2. Calling the _load stub materialises the server
+    # ------------------------------------------------------------------
+
+    def test_load_stub_materialises_server(self, monkeypatch):
+        """Calling _materialise() should remove stub, call _do_mount, and activate."""
+        from src.config import CatalogueEntry as CE
+        cat = self._make_cat("myserver")
+        proxy_server._pending_servers["myserver"] = cat
+
+        mounted = []
+
+        def fake_mount(entry):
+            mounted.append(entry.name)
+            proxy_server._active_servers[entry.name] = (entry, None, 8)
+            return True, f"Mock-mounted '{entry.name}'."
+
+        monkeypatch.setattr(proxy_server, "_do_mount", fake_mount)
+
+        result = proxy_server._materialise("myserver")
+        data = json.loads(result)
+
+        assert data["ok"] is True
+        assert "myserver" in mounted
+        assert "myserver" not in proxy_server._pending_servers
+        assert "myserver" in proxy_server._active_servers
+
+    # ------------------------------------------------------------------
+    # 3. Deactivating a pending server clears it
+    # ------------------------------------------------------------------
+
+    def test_deactivate_clears_pending(self):
+        """proxy_deactivate_server should remove a pending (not yet mounted) entry."""
+        cat = self._make_cat("lazysvc")
+        proxy_server._pending_servers["lazysvc"] = cat
+
+        raw = proxy_server.proxy_deactivate_server("lazysvc")
+        data = json.loads(raw)
+
+        assert data["ok"] is True
+        assert "lazysvc" not in proxy_server._pending_servers
+        assert "lazysvc" not in proxy_server._active_servers
+
+    def test_deactivate_unknown_server_returns_error(self):
+        """Deactivating a server that is neither active nor pending should return ok=False."""
+        raw = proxy_server.proxy_deactivate_server("doesnotexist")
+        data = json.loads(raw)
+        assert data["ok"] is False
+
+    # ------------------------------------------------------------------
+    # 4. list_active_servers shows pending entries with correct status
+    # ------------------------------------------------------------------
+
+    def test_list_active_shows_pending_status(self):
+        """proxy_list_active_servers must include pending entries with status='pending'."""
+        cat = self._make_cat("pendingsvc")
+        proxy_server._pending_servers["pendingsvc"] = cat
+
+        raw = proxy_server.proxy_list_active_servers()
+        data = json.loads(raw)
+
+        names_by_status = {s["name"]: s["status"] for s in data["active_servers"]}
+        assert "pendingsvc" in names_by_status
+        assert names_by_status["pendingsvc"] == "pending"
+
+    def test_list_active_shows_both_active_and_pending(self):
+        """Active servers show status='active'; pending show status='pending'."""
+        from src.config import ProxyEntry
+        # Add one active
+        entry = ProxyEntry(name="activesvc", url="http://localhost:9001/sse")
+        proxy_server._active_servers["activesvc"] = (entry, None, 5)
+        # Add one pending
+        cat = self._make_cat("lazysvc2")
+        proxy_server._pending_servers["lazysvc2"] = cat
+
+        raw = proxy_server.proxy_list_active_servers()
+        data = json.loads(raw)
+
+        names_by_status = {s["name"]: s["status"] for s in data["active_servers"]}
+        assert names_by_status.get("activesvc") == "active"
+        assert names_by_status.get("lazysvc2") == "pending"
