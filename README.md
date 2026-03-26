@@ -4,6 +4,8 @@ A smart MCP proxy server that lazily loads relevant MCP tool servers based on yo
 
 Part of the [Anti-Gravity Agents Prompt Protocol](https://github.com/SPhillips1337/AntigravityAgentsPromptProtocol) ecosystem.
 
+> **This project is a working, client-agnostic solution to [anthropics/claude-code#7336 — *Feature Request: Lazy Loading for MCP Servers and Tools*](https://github.com/anthropics/claude-code/issues/7336).** See [Related Work](#related-work--problem-context) below.
+
 ## How It Works
 
 ```
@@ -188,6 +190,22 @@ This project uses the Anti-Gravity LTM protocol. Agent context lives in `.antigr
 - `architectural_decisions/` — design tradeoffs and rationale
 
 Bootstrap your local LTM by following [BOOTSTRAP.md](https://github.com/SPhillips1337/AntigravityAgentsPromptProtocol/blob/main/BOOTSTRAP.md) from the protocol repo. See `AGENTS.md` for the full agent protocol.
+
+## Related Work & Problem Context
+
+[anthropics/claude-code#7336](https://github.com/anthropics/claude-code/issues/7336) documented a real problem: loading all MCP servers at session startup can consume **54 % of the available context window** (~108k of 200k tokens) before a single message is sent. Several approaches have been proposed or built:
+
+| Project | Approach | Limitation |
+|---|---|---|
+| [machjesusmoto/claude-lazy-loading](https://github.com/machjesusmoto/claude-lazy-loading) | Offline registry generator — produces a lightweight token index from your MCP config | No runtime injection; explicitly lists *"Automatic lazy loading at runtime"* as needing Claude Code support |
+| [block-town/mcp-gateway](https://github.com/block-town/mcp-gateway) | Replaces all tools with 3–4 generic `gw(service, tool, args)` shim tools; dispatches at call time | Hard-coded, requires fork-and-edit per stack; the AI loses full tool type-safety and discovery |
+| **This project** | Smart proxy that activates only the servers relevant to the current project context via `proxy_handshake()`, enforces a tool budget via LRU eviction, and is fully dynamic at runtime | Works with *any* MCP client today — no IDE changes required |
+
+### Why the MCP layer is the right place to solve this
+
+1. **Client-agnostic** — the proxy handles lazy loading transparently for any MCP client (Claude Code, Windsurf, Antigravity, opencode, Claude Desktop…), not just one IDE.
+2. **`proxy_handshake()` already delivers the "After" UX from the issue** — the feature request's ideal example shows `> Auto-loading: context7, magic [+3.5k tokens]` after detecting keywords in user input. That is exactly what `proxy_handshake({ tech_stack, task_description })` does today.
+3. **No fork required** — add servers to `catalogue.json` or `user.catalogue.json`; the matcher and budget enforcement are automatic.
 
 ## Inspiration
 
