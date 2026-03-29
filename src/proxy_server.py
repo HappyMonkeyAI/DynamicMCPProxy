@@ -40,6 +40,8 @@ logging.basicConfig(stream=sys.stderr)
 
 from fastmcp import FastMCP, Client
 from fastmcp.server.server import create_proxy
+from fastmcp.server.low_level import LowLevelServer
+from mcp.types import PromptsCapability
 
 from .auth import authenticate, AuthError
 from .config import (
@@ -80,7 +82,6 @@ _lock = threading.Lock()
 # key = server name, value = CatalogueEntry or ProxyEntry
 _pending_servers: dict[str, Any] = {}
 
-# FastMCP main server
 mcp = FastMCP(
     name="Dynamic MCP Proxy",
     instructions=(
@@ -89,6 +90,31 @@ mcp = FastMCP(
         "context, or explore mcp://proxy/servers to see what's available."
     ),
 )
+
+
+# ---------------------------------------------------------------------------
+# Capability Patches
+# ---------------------------------------------------------------------------
+
+# Monkeypatch LowLevelServer.get_capabilities to explicitly declare 'listChanged'
+# for prompts. This resolves client warnings where prompts are offered but 
+# change-notification capability is not declared (even for static lists).
+_original_get_capabilities = LowLevelServer.get_capabilities
+
+
+def _patched_get_capabilities(self, notification_options=None, experimental_capabilities=None):
+    capabilities = _original_get_capabilities(self, notification_options, experimental_capabilities)
+    # Ensure prompts capability exists and has listChanged=True
+    if capabilities.prompts is None:
+        # If we have any prompts registered, declare the capability
+        capabilities.prompts = PromptsCapability(listChanged=True)
+    else:
+        capabilities.prompts.listChanged = True
+    return capabilities
+
+
+# Apply the monkeypatch to all LowLevelServer instances created by FastMCP
+LowLevelServer.get_capabilities = _patched_get_capabilities
 
 
 # ---------------------------------------------------------------------------
