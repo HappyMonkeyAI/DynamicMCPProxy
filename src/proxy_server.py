@@ -172,11 +172,11 @@ def _do_mount(entry: ProxyEntry) -> tuple[bool, str]:
         # Wrap proxy.call_tool to add auditing for child tool calls
         original_call = proxy.call_tool
         
-        async def audited_call(name: str, arguments: dict | None = None) -> Any:
+        async def audited_call(name: str, arguments: dict | None = None, **kwargs) -> Any:
             start_time = time.monotonic()
             outcome = "ok"
             try:
-                result = await original_call(name, arguments)
+                result = await original_call(name, arguments, **kwargs)
                 return result
             except Exception as e:
                 outcome = f"error: {str(e)}"
@@ -625,22 +625,23 @@ def proxy_list_available_servers(filter_tag: str = "") -> str:
 @mcp.tool(name="proxy_list_tools")
 async def proxy_list_tools(server_name: Optional[str] = None) -> str:
     """
-    List all available tools and their exact names, including any prefixes.
+    List all registered tools by inspecting the FastMCP instance.
     If server_name is provided, filters for tools from that child server.
     """
     try:
         tools = await mcp.list_tools()
-        results = []
-        for t in tools:
-            # Exclude proxy_* tools to keep the list focused on child servers
-            if not t.name.startswith("proxy_"):
-                if server_name is None or t.name.startswith(f"{server_name}_"):
-                    results.append({"name": t.name, "description": t.description})
         
+        filtered = [t for t in tools if not t.name.startswith("proxy_")]
+        
+        if server_name:
+            prefix = f"{server_name}_"
+            filtered = [t for t in filtered if t.name.startswith(prefix)]
+            
         return json.dumps({
-            "tools": results,
-            "total": len(results),
-            "note": "Use these exact 'name' values when making tool calls."
+            "ok": True,
+            "tools": [{"name": t.name, "description": t.description} for t in filtered],
+            "total": len(filtered),
+            "note": "Tools must be called by their full name (e.g. servername_toolname)."
         }, indent=2)
     except Exception as exc:
         return json.dumps({"ok": False, "error": f"Failed to list tools: {exc}"})
@@ -649,18 +650,19 @@ async def proxy_list_tools(server_name: Optional[str] = None) -> str:
 @mcp.tool(name="proxy_inspect_registry")
 async def proxy_inspect_registry() -> str:
     """
-    Diagnostic tool: Expose the RAW internal tool list and proxy state.
-    Includes counts of active servers and total tools, plus ANY registered tool.
+    Diagnostic tool: Expose proxy state and server counts.
     """
-    all_tools = await mcp.list_tools()
-    
+    try:
+        tools = await mcp.list_tools()
+        registry = [{"name": t.name} for t in tools]
+    except Exception:
+        registry = []
+
     return json.dumps({
         "status": "ok",
         "active_servers": list(_active_servers.keys()),
-        "total_tools": len(all_tools),
-        "registry": [{"name": t.name, "description": t.description[:100]} for t in all_tools],
-        "tool_budget": _config.tool_budget,
-        "budget_remaining": _config.tool_budget - len(all_tools)
+        "total_tools": len(registry),
+        "registry": registry
     }, indent=2)
 
 
