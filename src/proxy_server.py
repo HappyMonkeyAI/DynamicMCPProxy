@@ -64,6 +64,7 @@ from .guardrails import (
 )
 from .matcher import ProjectContext, rank_servers
 from .plugin_scanner import PluginScanner
+from .loaders.rest import RESTLoader
 
 # ---------------------------------------------------------------------------
 # Globals
@@ -153,6 +154,90 @@ def _estimate_tool_count(entry: ProxyEntry) -> int:
     return 10
 
 
+def _get_nested(data: Any, path: str) -> Any:
+    """Helper to get a value from a nested dict/list using dot notation."""
+    parts = path.split(".")
+    for part in parts:
+        if isinstance(data, dict):
+            data = data.get(part)
+        elif isinstance(data, list) and part.isdigit():
+            idx = int(part)
+            data = data[idx] if 0 <= idx < len(data) else None
+        else:
+            return None
+    return data
+
+
+def _apply_steering(result: Any, entry: ProxyEntry) -> Any:
+    """
+    Apply response shaping: pick, omit, template, and token_budget.
+    Applies to the 'content' list of an MCP ToolResult.
+    """
+    if not hasattr(result, "content") or not isinstance(result.content, list):
+        return result
+
+    # Check if we have anything to do
+    if not any([entry.pick, entry.omit, entry.template, entry.token_budget]):
+        return result
+
+    new_content = []
+    for item in result.content:
+        # We only steer text content that contains JSON (common for API bridges)
+        # or dictionary-like content if the SDK supports it.
+        # FastMCP often returns CallToolResult with TextContent.
+        if hasattr(item, "text") and isinstance(item.text, str):
+            try:
+                data = json.loads(item.text)
+                
+                # 1. Pick
+                if entry.pick:
+                    if isinstance(data, list):
+                        data = [{k: _get_nested(row, k) for k in entry.pick} for row in data]
+                    elif isinstance(data, dict):
+                        data = {k: _get_nested(data, k) for k in entry.pick}
+                
+                # 2. Omit
+                if entry.omit:
+                    if isinstance(data, list):
+                        for row in data:
+                            if isinstance(row, dict):
+                                for k in entry.omit:
+                                    row.pop(k, None)
+                    elif isinstance(data, dict):
+                        for k in entry.omit:
+                            data.pop(k, None)
+
+                # 3. Template
+                if entry.template:
+                    if isinstance(data, list):
+                        text = "\n".join([entry.template.format(**row) for row in data if isinstance(row, dict)])
+                    elif isinstance(data, dict):
+                        text = entry.template.format(**data)
+                    else:
+                        text = json.dumps(data)
+                else:
+                    text = json.dumps(data, indent=2)
+
+                # 4. Token Budget (approximate chars / 4)
+                if entry.token_budget:
+                    max_chars = entry.token_budget * 4
+                    if len(text) > max_chars:
+                        text = text[:max_chars] + "\n... (truncated by token_budget)"
+
+                item.text = text
+            except (json.JSONDecodeError, KeyError, AttributeError, ValueError):
+                # If it's not JSON or template fails, leave as is (or apply budget only)
+                if entry.token_budget:
+                    max_chars = entry.token_budget * 4
+                    if len(item.text) > max_chars:
+                        item.text = item.text[:max_chars] + "\n... (truncated by token_budget)"
+        
+        new_content.append(item)
+
+    result.content = new_content
+    return result
+
+
 def _do_mount(entry: ProxyEntry) -> tuple[bool, str]:
     """
     Mount a single ProxyEntry as a child server (materialize immediately).
@@ -165,11 +250,22 @@ def _do_mount(entry: ProxyEntry) -> tuple[bool, str]:
     _evict_lru_if_needed(needed=estimated)
 
     try:
-        mcp_config = _mcp_config_for_entry(entry)
-        client = Client(mcp_config)
-        proxy = create_proxy(client)
+        if entry.runtime == "rest":
+            # Extract config path from rest:// URL
+            config_path = entry.url.removeprefix("rest://")
+            # If path is relative, make it absolute relative to project root
+            p = Path(config_path)
+            if not p.is_absolute():
+                p = Path(__file__).parent.parent / p
+            
+            loader = RESTLoader(str(p), name=entry.name)
+            proxy = loader.get_mcp()
+        else:
+            mcp_config = _mcp_config_for_entry(entry)
+            client = Client(mcp_config)
+            proxy = create_proxy(client)
         
-        # Wrap proxy.call_tool to add auditing for child tool calls
+        # Wrap proxy.call_tool to add auditing and steering
         original_call = proxy.call_tool
         
         async def audited_call(name: str, arguments: dict | None = None, **kwargs) -> Any:
@@ -177,6 +273,8 @@ def _do_mount(entry: ProxyEntry) -> tuple[bool, str]:
             outcome = "ok"
             try:
                 result = await original_call(name, arguments, **kwargs)
+                # Apply steering / response shaping
+                result = _apply_steering(result, entry)
                 return result
             except Exception as e:
                 outcome = f"error: {str(e)}"
@@ -327,17 +425,30 @@ def _resolve_catalogue_entry(name: str) -> Optional[CatalogueEntry]:
 
 def _catalogue_entry_to_proxy(cat: CatalogueEntry) -> Optional[ProxyEntry]:
     """Convert a CatalogueEntry to a ProxyEntry for mounting."""
-    if cat.url:
-        return ProxyEntry(name=cat.name, url=cat.url, tags=cat.tags, runtime=cat.runtime, env_vars=cat.env_vars)
-    if cat.command:
-        return ProxyEntry(
-            name=cat.name,
-            url=f"stdio://{cat.command}",
-            tags=cat.tags,
-            runtime="stdio",
-            env_vars=cat.env_vars
-        )
-    return None
+    url = cat.url
+    runtime = cat.runtime
+
+    if not url:
+        if cat.command:
+            url = f"stdio://{cat.command}"
+            runtime = "stdio"
+        elif cat.config_path:
+            url = f"rest://{cat.config_path}"
+            runtime = "rest"
+        else:
+            return None
+
+    return ProxyEntry(
+        name=cat.name,
+        url=url,
+        tags=cat.tags,
+        runtime=runtime,
+        env_vars=cat.env_vars,
+        pick=cat.pick,
+        omit=cat.omit,
+        template=cat.template,
+        token_budget=cat.token_budget,
+    )
 
 
 def _mcp_config_for_entry(entry: ProxyEntry) -> dict:
@@ -664,6 +775,69 @@ async def proxy_inspect_registry() -> str:
         "total_tools": len(registry),
         "registry": registry
     }, indent=2)
+
+
+@mcp.tool(name="proxy_activate_from_spec")
+async def proxy_activate_from_spec(
+    name: str,
+    spec_url: str,
+    spec_type: str = "openapi",
+    eager: bool = True
+) -> str:
+    """
+    Generate an MCP server from an OpenAPI/GraphQL spec and activate it.
+    
+    Args:
+        name: A unique name for this generated server
+        spec_url: URL to the OpenAPI spec (JSON/YAML) or GraphQL endpoint
+        spec_type: 'openapi' or 'graphql'
+        eager: If True, mount the server immediately
+    """
+    if _config.guardrails_enabled and not check_rate_limit("anonymous"):
+        return json.dumps({"ok": False, "error": "Rate limit exceeded."})
+
+    t0 = time.monotonic()
+    configs_dir = Path(__file__).parent.parent / "configs"
+    configs_dir.mkdir(exist_ok=True)
+    config_path = configs_dir / f"{name}.json"
+
+    # Use npx to run 40mcp generate
+    cmd = f"npx -y 40mcp generate {spec_url} --name {name}"
+    if spec_type == "graphql":
+        cmd += " --graphql"
+    
+    try:
+        proc = await asyncio.create_subprocess_shell(
+            cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await proc.communicate()
+        
+        if proc.returncode != 0:
+            return json.dumps({"ok": False, "error": f"Generation failed: {stderr.decode()}"})
+        
+        # 40mcp generate outputs the JSON to stdout
+        with open(config_path, "w") as f:
+            f.write(stdout.decode())
+
+        # Register it in the catalogue for this session
+        entry = CatalogueEntry(
+            name=name,
+            description=f"Generated from {spec_url}",
+            runtime="rest",
+            config_path=f"configs/{name}.json"
+        )
+        
+        # Add to in-memory catalogue
+        global _catalogue
+        _catalogue.append(entry)
+
+        # Activate
+        return proxy_activate_server(name, eager=eager)
+
+    except Exception as e:
+        return json.dumps({"ok": False, "error": f"Failed to generate/activate: {str(e)}"})
 
 
 @mcp.tool(name="proxy_activate_server")

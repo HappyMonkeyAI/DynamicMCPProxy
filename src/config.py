@@ -38,6 +38,11 @@ class ProxyEntry(BaseModel):
     # ISO timestamp of last use, used for LRU eviction
     last_used: Optional[str] = None
     env_vars: list[str] = Field(default_factory=list, description="Environment variables to pass to the tool server")
+    # Steering / Response Shaping
+    pick: list[str] = Field(default_factory=list, description="Fields to pick from the tool response")
+    omit: list[str] = Field(default_factory=list, description="Fields to omit from the tool response")
+    template: Optional[str] = Field(None, description="Formatting template for the response")
+    token_budget: Optional[int] = Field(None, description="Max tokens (approx) for the tool response")
 
 
 class AppConfig(BaseModel):
@@ -76,11 +81,18 @@ class CatalogueEntry(BaseModel):
     url: Optional[str] = None
     tags: list[str] = Field(default_factory=list)
     tech_stack: list[str] = Field(default_factory=list)
-    runtime: Literal["stdio", "sse", "http"] = "stdio"
+    runtime: Literal["stdio", "sse", "http", "rest"] = "stdio"
     # Optional env vars required by this server (keys only, values from caller)
     env_vars: list[str] = Field(default_factory=list)
     # Best-effort estimate of how many tools this server exposes (used for budget tracking)
     estimated_tools: int = 10
+    # Steering / Response Shaping
+    pick: list[str] = Field(default_factory=list)
+    omit: list[str] = Field(default_factory=list)
+    template: Optional[str] = None
+    token_budget: Optional[int] = None
+    # Path to a 40mcp-style REST bridge JSON config (for runtime="rest")
+    config_path: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------

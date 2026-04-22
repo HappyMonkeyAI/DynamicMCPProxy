@@ -1,0 +1,33 @@
+{
+  "name": "mock-api",
+  "baseUrl": "https://jsonplaceholder.typicode.com",
+  "tools": [
+    {
+      "name": "get_post",
+      "description": "Get a post by ID",
+      "method": "GET",
+      "path": "/posts/{id}",
+      "queryMap": {
+        "id": "id"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" }
+        },
+        "required": ["id"]
+      }
+    },
+    {
+      "name": "create_post",
+      "description": "Create a new post",
+      "method": "POST",
+      "path": "/posts",
+      "bodyMap": {
+        "title": "title",
+        "body": "body",
+        "userId": "userId"
+      }
+    }
+  ]
+}

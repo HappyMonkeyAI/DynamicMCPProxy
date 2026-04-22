@@ -1,0 +1,116 @@
+{
+  "name": "slack",
+  "usage": {
+    "envVars": [
+      "SLACK_BOT_TOKEN"
+    ],
+    "setup": "Create a Slack app at https://api.slack.com/apps, add a bot token with the required OAuth scopes, install the app to your workspace, and copy the Bot User OAuth Token from the OAuth & Permissions page."
+  },
+  "version": "1.0.0",
+  "baseUrl": "https://slack.com/api",
+  "auth": {
+    "type": "bearer",
+    "envVar": "SLACK_BOT_TOKEN"
+  },
+  "tools": [
+    {
+      "name": "list_channels",
+      "description": "List Slack channels the bot has access to.",
+      "method": "GET",
+      "path": "/conversations.list",
+      "queryMap": {
+        "channel_types": "types",
+        "max_results": "limit",
+        "exclude_archived": "exclude_archived"
+      },
+      "response": {
+        "pick": [
+          "channels"
+        ],
+        "template": "#{name} ({num_members} members) — {purpose.value}",
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_types": {
+            "type": "string",
+            "description": "Comma-separated: public_channel, private_channel, mpim, im"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max channels to return"
+          },
+          "exclude_archived": {
+            "type": "boolean",
+            "description": "Exclude archived channels"
+          }
+        }
+      }
+    },
+    {
+      "name": "send_message",
+      "description": "Send a message to a Slack channel.",
+      "method": "POST",
+      "path": "/chat.postMessage",
+      "bodyMap": {
+        "channel_id": "channel",
+        "message_text": "text",
+        "thread_id": "thread_ts"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "description": "Channel ID (C...)"
+          },
+          "message_text": {
+            "type": "string",
+            "description": "Message text (markdown supported)"
+          },
+          "thread_id": {
+            "type": "string",
+            "description": "Thread timestamp to reply in thread"
+          }
+        },
+        "required": [
+          "channel_id",
+          "message_text"
+        ]
+      }
+    },
+    {
+      "name": "get_channel_history",
+      "description": "Get recent messages from a Slack channel.",
+      "method": "GET",
+      "path": "/conversations.history",
+      "queryMap": {
+        "channel_id": "channel",
+        "max_results": "limit"
+      },
+      "response": {
+        "pick": [
+          "messages"
+        ],
+        "tokenBudget": 4000
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "description": "Channel ID (C...)"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max messages to return"
+          }
+        },
+        "required": [
+          "channel_id"
+        ]
+      }
+    }
+  ]
+}

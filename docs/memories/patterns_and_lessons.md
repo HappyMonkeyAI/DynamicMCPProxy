@@ -54,6 +54,23 @@
 **Fix:** Two-phase mounting — `_register_pending(entry)` registers a single `{name}_load` stub tool (via `mcp.tool(name=..., description=...)(stub_fn)`) and stores the entry in `_pending_servers`. `_materialise(name)` is called when the stub fires: it removes the stub from `mcp._tool_manager._tools`, pops from `_pending_servers`, converts `CatalogueEntry → ProxyEntry`, then calls `_do_mount()`. `proxy_deactivate_server()` handles both active and pending states. `_tool_count()` counts pending stubs as 1 each. `_reset_proxy_state()` in tests must clear `_pending_servers` too.
 **Status:** Resolved. All 59 tests pass (commit 05c3b81).
 
+### [S-11] Mounting Local MCP Servers via uv
+**Pattern:** Running local MCP servers that use `uv` for dependency management requires ensuring the environment is synced with necessary extras (e.g., `ai`, `shell`) and using absolute paths for the project directory.
+**Fix:** Use `uv sync --project /path/to/project --extra all` to prepare the environment, then use `uv run --project /path/to/project --quiet <command>` as the server's `command` in `user.catalogue.json`.
+**Status:** Resolved. Successfully added Scrapling.
+
+### [S-12] Response Steering for Context Efficiency
+**Pattern:** Large API responses (Slack, Jira) consume excessive tokens and distract the AI with irrelevant metadata.
+**Fix:** Implement a "Steering" layer in the tool execution loop (`audited_call`). Use `pick` and `omit` for field filtering, `template` for formatting, and `token_budget` for hard truncation. This ensures the context window only contains the highest-signal information.
+
+### [S-13] FastMCP tool signature constraints
+**Pattern:** FastMCP does not support `**kwargs` in tool functions. It uses inspection and type hints to generate the MCP tool schema.
+**Fix:** For dynamic tool registration (like the `RESTLoader`), generate wrapper functions with explicit signatures at runtime using `exec()`. Pass the implementation function via the `globals` dict to ensure it's available in the generated function's scope.
+
+### [S-14] Declarative REST Bridges
+**Pattern:** Building custom MCP servers for every REST API is high-friction.
+**Fix:** Adopt the `40mcp` JSON schema for declarative bridges. Implement a native Python `RESTLoader` that maps JSON definitions to FastMCP tools using `httpx`. This allows instant integration of community API configs without Node.js dependencies.
+
 ## Failure Post-Mortems
 
 ### [F-01] nodeenv venv approach
