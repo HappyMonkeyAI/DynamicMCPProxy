@@ -59,9 +59,11 @@ class TestHandshakeOrchestration:
     live transport.
     """
 
-    def setup_method(self):
+    @pytest.fixture(autouse=True)
+    def setup(self, monkeypatch):
         """Reset state before every test."""
         _reset_proxy_state()
+        monkeypatch.setattr(proxy_server, "load_config", lambda: proxy_server.AppConfig())
         proxy_server._startup()
 
     def test_handshake_returns_valid_json(self):
@@ -139,8 +141,11 @@ class TestHandshakeOrchestration:
 class TestProxyManagementTools:
     """Tests for the proxy.* management tools."""
 
-    def setup_method(self):
+    @pytest.fixture(autouse=True)
+    def setup(self, monkeypatch):
         _reset_proxy_state()
+        # Ensure we don't load the real proxy_config.json during tests
+        monkeypatch.setattr(proxy_server, "load_config", lambda: proxy_server.AppConfig())
         proxy_server._startup()
 
     def test_list_active_servers_empty(self):
@@ -216,8 +221,10 @@ class TestProxyManagementTools:
 class TestMCPResources:
     """Tests for the always-on MCP Resources."""
 
-    def setup_method(self):
+    @pytest.fixture(autouse=True)
+    def setup(self, monkeypatch):
         _reset_proxy_state()
+        monkeypatch.setattr(proxy_server, "load_config", lambda: proxy_server.AppConfig())
         proxy_server._startup()
 
     def test_resource_info(self):
@@ -279,8 +286,10 @@ class TestLRUEviction:
 class TestProxyListTools:
     """Tests for the async proxy_list_tools tool."""
 
-    def setup_method(self):
+    @pytest.fixture(autouse=True)
+    def setup(self, monkeypatch):
         _reset_proxy_state()
+        monkeypatch.setattr(proxy_server, "load_config", lambda: proxy_server.AppConfig())
         proxy_server._startup()
 
     def _run(self, coro):
@@ -343,8 +352,10 @@ class TestProxyListTools:
 class TestDiagnostics:
     """Tests for the new diagnostic and auditing features."""
 
-    def setup_method(self):
+    @pytest.fixture(autouse=True)
+    def setup(self, monkeypatch):
         _reset_proxy_state()
+        monkeypatch.setattr(proxy_server, "load_config", lambda: proxy_server.AppConfig())
         proxy_server._startup()
 
     def _run(self, coro):
@@ -449,8 +460,10 @@ class TestDiagnostics:
 class TestDeferredLoading:
     """Tests for two-phase deferred (lazy) tool loading."""
 
-    def setup_method(self):
+    @pytest.fixture(autouse=True)
+    def setup(self, monkeypatch):
         _reset_proxy_state()
+        monkeypatch.setattr(proxy_server, "load_config", lambda: proxy_server.AppConfig())
         proxy_server._startup()
         proxy_server._pending_servers.clear()
 
