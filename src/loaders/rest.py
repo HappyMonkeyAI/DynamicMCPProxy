@@ -140,11 +140,9 @@ class RESTLoader:
         # We default to Any (or str) for all args if not specified
         arg_str = ", ".join(arg_names)
         
-        # Build the wrapper using exec
-        # We pass tool_fn_impl in the globals dict so the generated function can find it
-        exec_globals = {"tool_fn_impl": tool_fn_impl}
+        dict_entries = ", ".join(["'%s': %s" % (n, n) for n in arg_names])
         wrapper_code = f"async def {tool_name}({arg_str}):\n"
-        wrapper_code += f"    return await tool_fn_impl(**{{{', '.join([f'\"{n}\": {n}' for n in arg_names])}}})\n"
+        wrapper_code += f"    return await tool_fn_impl(**{{{dict_entries}}})\n"
         
         try:
             exec(wrapper_code, exec_globals)

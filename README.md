@@ -75,9 +75,12 @@ Adjust `PATH` to match your system (`type npx` and `type uvx` show the right dir
 | `proxy_handshake(tech_stack, task_description, ...)` | Context handshake — activates relevant servers |
 | `proxy_list_active_servers()` | Currently mounted servers + tool counts |
 | `proxy_list_available_servers(filter_tag?)` | Browse catalogue |
-| `proxy_activate_server(name)` | Explicitly mount a server |
+| `proxy_activate_server(name, eager?)` | Mount a server (deferred by default) |
+| `proxy_activate_from_spec(name, url, type?)` | Generate & mount server from OpenAPI/GraphQL |
 | `proxy_deactivate_server(name)` | Free up tool budget |
-| `proxy_add_custom_proxy(name, url, tags, runtime)` | Add an ad-hoc server |
+| `proxy_add_custom_proxy(name, url, tags, runtime)` | Add an ad-hoc server (SSE/HTTP only) |
+| `proxy_list_tools(server_name?)` | List exact names of all mounted tools |
+| `proxy_inspect_registry()` | Diagnostic: Full dump of current tool registry |
 | `proxy_get_metrics()` | Live memory/CPU/uptime metrics |
 
 ## MCP Resources
@@ -111,10 +114,29 @@ Adjust `PATH` to match your system (`type npx` and `type uvx` show the right dir
     "tags": ["custom"],
     "tech_stack": ["any"],
     "runtime": "stdio",
-    "env_vars": ["MY_API_KEY"]
+    "env_vars": ["MY_API_KEY"],
+    "pick": ["id", "status"],
+    "token_budget": 500
   }
 ]
 ```
+
+### Response Steering
+
+Optimize AI context usage by shaping server responses before they reach the LLM. Applied to any server (stdio, SSE, REST):
+
+- **`pick`**: Array of dot-notation paths to keep (all others dropped).
+- **`omit`**: Array of paths to remove.
+- **`template`**: Python-style format string (e.g., `"{id}: {content}"`) to flatten complex JSON into readable text.
+- **`token_budget`**: Hard character cap (approx tokens * 4) to prevent context flooding.
+
+### REST Bridge Support (via 40mcp)
+
+The proxy supports `runtime: "rest"`, allowing it to act as a bridge for any OpenAPI or GraphQL API.
+
+1. **Auto-Generation**: Use `proxy_activate_from_spec(name, url)` to generate a server config in `./configs/` and mount it instantly.
+2. **Manual Config**: Add an entry with `"runtime": "rest"` and `"config_path": "configs/mysvc.json"`. The proxy uses the `40mcp` engine to map MCP tool calls to REST/GraphQL requests.
+
 
 ## Environment Variables
 
