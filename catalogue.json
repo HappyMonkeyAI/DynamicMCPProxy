@@ -1,7 +1,7 @@
 [
   {
     "name": "github",
-    "description": "GitHub MCP server — repos, issues, PRs, code search, branches, commits",
+    "description": "GitHub MCP server \u2014 repos, issues, PRs, code search, branches, commits",
     "command": "npx -y @modelcontextprotocol/server-github",
     "tags": [
       "github",
@@ -22,7 +22,7 @@
   },
   {
     "name": "gitlab",
-    "description": "GitLab MCP server — repos, issues, merge requests, CI pipelines",
+    "description": "GitLab MCP server \u2014 repos, issues, merge requests, CI pipelines",
     "command": "npx -y @modelcontextprotocol/server-gitlab",
     "tags": [
       "gitlab",
@@ -43,7 +43,7 @@
   },
   {
     "name": "filesystem",
-    "description": "Local filesystem access — read, write, list files and directories",
+    "description": "Local filesystem access \u2014 read, write, list files and directories",
     "command": "npx -y @modelcontextprotocol/server-filesystem",
     "tags": [
       "filesystem",
@@ -62,7 +62,7 @@
   },
   {
     "name": "postgres",
-    "description": "PostgreSQL MCP server — read-only SQL queries, schema inspection",
+    "description": "PostgreSQL MCP server \u2014 read-only SQL queries, schema inspection",
     "command": "npx -y @modelcontextprotocol/server-postgres",
     "tags": [
       "postgres",
@@ -88,7 +88,7 @@
   },
   {
     "name": "sqlite",
-    "description": "SQLite MCP server — local SQLite database read and write access",
+    "description": "SQLite MCP server \u2014 local SQLite database read and write access",
     "command": "npx -y @modelcontextprotocol/server-sqlite",
     "tags": [
       "sqlite",
@@ -109,7 +109,7 @@
   },
   {
     "name": "brave-search",
-    "description": "Brave Search API — web search, news search, local search",
+    "description": "Brave Search API \u2014 web search, news search, local search",
     "command": "npx -y @modelcontextprotocol/server-brave-search",
     "tags": [
       "search",
@@ -128,7 +128,7 @@
   },
   {
     "name": "memory",
-    "description": "Persistent memory / knowledge graph — store and recall facts across sessions",
+    "description": "Persistent memory / knowledge graph \u2014 store and recall facts across sessions",
     "command": "npx -y @modelcontextprotocol/server-memory",
     "tags": [
       "memory",
@@ -145,7 +145,7 @@
   },
   {
     "name": "fetch",
-    "description": "HTTP fetch — retrieve and convert web content to markdown, web scraping",
+    "description": "HTTP fetch \u2014 retrieve and convert web content to markdown, web scraping",
     "command": "uvx mcp-server-fetch",
     "tags": [
       "http",
@@ -165,7 +165,7 @@
   },
   {
     "name": "puppeteer",
-    "description": "Browser automation with Puppeteer — navigate, screenshot, interact with web pages",
+    "description": "Browser automation with Puppeteer \u2014 navigate, screenshot, interact with web pages",
     "command": "npx -y @modelcontextprotocol/server-puppeteer",
     "tags": [
       "browser",
@@ -186,7 +186,7 @@
   },
   {
     "name": "docker",
-    "description": "Docker MCP server — manage containers, images, volumes, networks",
+    "description": "Docker MCP server \u2014 manage containers, images, volumes, networks",
     "command": "npx -y @modelcontextprotocol/server-docker",
     "tags": [
       "docker",
@@ -203,7 +203,7 @@
   },
   {
     "name": "kubernetes",
-    "description": "Kubernetes MCP server — manage pods, deployments, services, namespaces",
+    "description": "Kubernetes MCP server \u2014 manage pods, deployments, services, namespaces",
     "command": "npx -y @modelcontextprotocol/server-kubernetes",
     "tags": [
       "kubernetes",
@@ -238,7 +238,7 @@
   },
   {
     "name": "google-drive",
-    "description": "Google Drive MCP server — list, read, search files in Google Drive",
+    "description": "Google Drive MCP server \u2014 list, read, search files in Google Drive",
     "command": "npx -y @modelcontextprotocol/server-gdrive",
     "tags": [
       "google",
@@ -256,7 +256,7 @@
   },
   {
     "name": "google-maps",
-    "description": "Google Maps MCP server — geocoding, directions, places, distance matrix",
+    "description": "Google Maps MCP server \u2014 geocoding, directions, places, distance matrix",
     "command": "npx -y @modelcontextprotocol/server-google-maps",
     "tags": [
       "maps",
@@ -275,7 +275,7 @@
   },
   {
     "name": "aws-kb-retrieval",
-    "description": "AWS Knowledge Base Retrieval — semantic search over Bedrock knowledge bases",
+    "description": "AWS Knowledge Base Retrieval \u2014 semantic search over Bedrock knowledge bases",
     "command": "npx -y @modelcontextprotocol/server-aws-kb-retrieval",
     "tags": [
       "aws",
@@ -298,7 +298,7 @@
   },
   {
     "name": "everart",
-    "description": "EverArt AI image generation — create and edit images via AI",
+    "description": "EverArt AI image generation \u2014 create and edit images via AI",
     "command": "npx -y @modelcontextprotocol/server-everart",
     "tags": [
       "images",
@@ -317,7 +317,7 @@
   },
   {
     "name": "sequential-thinking",
-    "description": "Sequential thinking — structured multi-step reasoning for complex problems",
+    "description": "Sequential thinking \u2014 structured multi-step reasoning for complex problems",
     "command": "npx -y @modelcontextprotocol/server-sequential-thinking",
     "tags": [
       "reasoning",
@@ -335,7 +335,7 @@
   },
   {
     "name": "sentry",
-    "description": "Sentry MCP server — query issues, events, performance data",
+    "description": "Sentry MCP server \u2014 query issues, events, performance data",
     "command": "npx -y @sentry/mcp-server",
     "tags": [
       "sentry",
@@ -360,7 +360,7 @@
   },
   {
     "name": "linear",
-    "description": "Linear MCP server — issues, projects, cycles, teams",
+    "description": "Linear MCP server \u2014 issues, projects, cycles, teams",
     "command": "npx -y @linear/mcp-server",
     "tags": [
       "linear",
@@ -379,7 +379,7 @@
   },
   {
     "name": "hubspot",
-    "description": "HubSpot MCP server — contacts, companies, deals, tasks, CRM",
+    "description": "HubSpot MCP server \u2014 contacts, companies, deals, tasks, CRM",
     "command": "npx -y hubspot-mcp-server",
     "tags": [
       "hubspot",
@@ -400,7 +400,7 @@
   },
   {
     "name": "zendesk",
-    "description": "Zendesk MCP server — tickets, users, knowledge base, support",
+    "description": "Zendesk MCP server \u2014 tickets, users, knowledge base, support",
     "command": "uvx zendesk-mcp",
     "tags": [
       "zendesk",
@@ -422,7 +422,7 @@
   },
   {
     "name": "stripe",
-    "description": "Stripe MCP server — payments, customers, subscriptions, invoices",
+    "description": "Stripe MCP server \u2014 payments, customers, subscriptions, invoices",
     "command": "npx -y @stripe/mcp",
     "tags": [
       "stripe",
@@ -441,7 +441,7 @@
   },
   {
     "name": "neo4j",
-    "description": "Neo4j MCP server — graph database queries, schema exploration",
+    "description": "Neo4j MCP server \u2014 graph database queries, schema exploration",
     "command": "uvx mcp-neo4j-cypher",
     "tags": [
       "neo4j",
@@ -464,7 +464,7 @@
   },
   {
     "name": "redis",
-    "description": "Redis MCP server — key/value store operations, pub/sub",
+    "description": "Redis MCP server \u2014 key/value store operations, pub/sub",
     "command": "npx -y @modelcontextprotocol/server-redis",
     "tags": [
       "redis",
@@ -489,7 +489,7 @@
   },
   {
     "name": "terraform",
-    "description": "Terraform MCP server — IaC plans, apply, state management",
+    "description": "Terraform MCP server \u2014 IaC plans, apply, state management",
     "command": "npx -y terraform-mcp-server",
     "tags": [
       "terraform",
@@ -506,7 +506,7 @@
   },
   {
     "name": "perplexity",
-    "description": "Perplexity AI search — research-grade web search with citations",
+    "description": "Perplexity AI search \u2014 research-grade web search with citations",
     "command": "npx -y server-perplexity-ask",
     "tags": [
       "search",
@@ -525,7 +525,7 @@
   },
   {
     "name": "git",
-    "description": "Git MCP server — read, search, diff, log, blame local git repositories without needing GitHub/GitLab tokens",
+    "description": "Git MCP server \u2014 read, search, diff, log, blame local git repositories without needing GitHub/GitLab tokens",
     "command": "uvx mcp-server-git",
     "tags": [
       "git",
@@ -545,7 +545,7 @@
   },
   {
     "name": "time",
-    "description": "Time and timezone tools — current time, timezone conversion, date arithmetic",
+    "description": "Time and timezone tools \u2014 current time, timezone conversion, date arithmetic",
     "command": "uvx mcp-server-time",
     "tags": [
       "time",
@@ -563,7 +563,7 @@
   },
   {
     "name": "everything",
-    "description": "Reference MCP server — demos all MCP features: tools, resources, prompts, sampling",
+    "description": "Reference MCP server \u2014 demos all MCP features: tools, resources, prompts, sampling",
     "command": "npx -y @modelcontextprotocol/server-everything",
     "tags": [
       "reference",
@@ -581,7 +581,7 @@
   },
   {
     "name": "wikipedia",
-    "description": "Wikipedia MCP server — search and retrieve Wikipedia articles, free public API",
+    "description": "Wikipedia MCP server \u2014 search and retrieve Wikipedia articles, free public API",
     "command": "uvx mcp-server-wikipedia",
     "tags": [
       "wikipedia",
@@ -599,7 +599,7 @@
   },
   {
     "name": "arxiv",
-    "description": "arXiv MCP server — search and retrieve academic papers from arXiv, free public API",
+    "description": "arXiv MCP server \u2014 search and retrieve academic papers from arXiv, free public API",
     "command": "uvx arxiv-mcp-server",
     "tags": [
       "arxiv",
@@ -619,7 +619,7 @@
   },
   {
     "name": "open-meteo-weather",
-    "description": "Open-Meteo weather — free weather forecasts and historical data, no API key required",
+    "description": "Open-Meteo weather \u2014 free weather forecasts and historical data, no API key required",
     "command": "uvx mcp-server-openmeteo",
     "tags": [
       "weather",
@@ -637,7 +637,7 @@
   },
   {
     "name": "searxng",
-    "description": "SearXNG web search — privacy-respecting meta-search engine, self-hosted or public instances",
+    "description": "SearXNG web search \u2014 privacy-respecting meta-search engine, self-hosted or public instances",
     "command": "uvx mcp-server-searxng",
     "tags": [
       "search",
@@ -655,7 +655,7 @@
   },
   {
     "name": "obsidian",
-    "description": "Obsidian vault MCP server — read, search, write notes in a local Obsidian vault",
+    "description": "Obsidian vault MCP server \u2014 read, search, write notes in a local Obsidian vault",
     "command": "npx -y mcp-obsidian",
     "tags": [
       "obsidian",
@@ -674,7 +674,7 @@
   },
   {
     "name": "pandoc",
-    "description": "Pandoc document conversion — convert between Markdown, HTML, PDF, DOCX and more",
+    "description": "Pandoc document conversion \u2014 convert between Markdown, HTML, PDF, DOCX and more",
     "command": "uvx mcp-pandoc",
     "tags": [
       "pandoc",
@@ -694,7 +694,7 @@
   },
   {
     "name": "everything-search",
-    "description": "Fast local file search — cross-platform file system search (Windows/macOS/Linux)",
+    "description": "Fast local file search \u2014 cross-platform file system search (Windows/macOS/Linux)",
     "command": "uvx mcp-everything-search",
     "tags": [
       "search",
@@ -712,7 +712,7 @@
   },
   {
     "name": "playwright",
-    "description": "Playwright browser automation — navigate pages, capture screenshots, scrape content, run E2E tests",
+    "description": "Playwright browser automation \u2014 navigate pages, capture screenshots, scrape content, run E2E tests",
     "command": "npx -y @playwright/mcp",
     "tags": [
       "playwright",
@@ -734,7 +734,7 @@
   },
   {
     "name": "mcp-local-rag",
-    "description": "Local RAG search — semantic search over local documents using DuckDuckGo and local embeddings, no external API needed",
+    "description": "Local RAG search \u2014 semantic search over local documents using DuckDuckGo and local embeddings, no external API needed",
     "command": "uvx mcp-local-rag",
     "tags": [
       "rag",
@@ -753,7 +753,7 @@
   },
   {
     "name": "markdownify",
-    "description": "Markdownify — convert PPTX, HTML, PDF, YouTube transcripts and more to clean Markdown",
+    "description": "Markdownify \u2014 convert PPTX, HTML, PDF, YouTube transcripts and more to clean Markdown",
     "command": "uvx markdownify-mcp",
     "tags": [
       "markdown",
@@ -773,7 +773,7 @@
   },
   {
     "name": "pubmed",
-    "description": "PubMed MCP server — search and access biomedical research articles from PubMed, free public API",
+    "description": "PubMed MCP server \u2014 search and access biomedical research articles from PubMed, free public API",
     "command": "uvx mcp-server-pubmed",
     "tags": [
       "pubmed",
@@ -792,7 +792,7 @@
   },
   {
     "name": "quickchart",
-    "description": "QuickChart — generate charts and graphs from data using QuickChart.io, free tier available",
+    "description": "QuickChart \u2014 generate charts and graphs from data using QuickChart.io, free tier available",
     "command": "uvx mcp-quickchart",
     "tags": [
       "charts",
@@ -811,7 +811,7 @@
   },
   {
     "name": "vega-lite",
-    "description": "Vega-Lite visualizations — generate data visualizations from fetched data using Vega-Lite",
+    "description": "Vega-Lite visualizations \u2014 generate data visualizations from fetched data using Vega-Lite",
     "command": "npx -y @modelcontextprotocol/server-vega-lite",
     "tags": [
       "visualization",
@@ -830,7 +830,7 @@
   },
   {
     "name": "mcp-grep",
-    "description": "Grep MCP server — regex pattern search across files and directories",
+    "description": "Grep MCP server \u2014 regex pattern search across files and directories",
     "command": "uvx mcp-grep",
     "tags": [
       "grep",
@@ -849,7 +849,7 @@
   },
   {
     "name": "desktop-commander",
-    "description": "DesktopCommander — file management, terminal commands, SSH connections on local machine",
+    "description": "DesktopCommander \u2014 file management, terminal commands, SSH connections on local machine",
     "command": "npx -y @wonderwhy-er/desktop-commander",
     "tags": [
       "terminal",
@@ -889,6 +889,29 @@
       "GOOGLE_GENERATIVE_AI_API_KEY",
       "OPENAI_API_KEY",
       "OPENCODE_API_KEY"
+    ]
+  },
+  {
+    "name": "task-master-ai",
+    "description": "AI-powered task management for development workflows \u2014 parse PRDs, track dependencies, and perform research",
+    "command": "npx -y task-master-ai",
+    "tags": [
+      "task-management",
+      "ai-development",
+      "productivity",
+      "planning",
+      "research",
+      "project-management"
+    ],
+    "tech_stack": [
+      "any"
+    ],
+    "runtime": "stdio",
+    "env_vars": [
+      "ANTHROPIC_API_KEY",
+      "OPENAI_API_KEY",
+      "GOOGLE_API_KEY",
+      "PERPLEXITY_API_KEY"
     ]
   }
 ]

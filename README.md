@@ -98,7 +98,7 @@ Adjust `PATH` to match your system (`type npx` and `type uvx` show the right dir
 
 ## Catalogue
 
-`catalogue.json` — 45 public MCP servers (GitHub, Docker, Postgres, Slack, Stripe, etc.).
+`catalogue.json` \u2014 46 public MCP servers (GitHub, Docker, Postgres, Slack, Stripe, etc.).
 
 `user.catalogue.json` — your private overlay (gitignored). Add personal servers here — local paths, private APIs, custom tools. Entries with the same name override the public catalogue.
 
