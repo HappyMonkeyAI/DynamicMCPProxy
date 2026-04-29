@@ -43,7 +43,6 @@ from fastmcp.server.server import create_proxy
 from fastmcp.server.low_level import LowLevelServer
 from mcp.types import PromptsCapability
 
-from .auth import authenticate, AuthError
 from .config import (
     AppConfig,
     CatalogueEntry,
