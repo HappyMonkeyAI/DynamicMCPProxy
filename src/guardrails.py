@@ -59,10 +59,11 @@ def scan_tool_description(name: str, description: str) -> list[str]:
 
 def truncate_result(result: str) -> str:
     """Cap tool results at _MAX_RESULT_BYTES to protect the AI context window."""
-    encoded = result.encode("utf-8", errors="replace")
+    encoded = result.encode("utf-8")
     if len(encoded) <= _MAX_RESULT_BYTES:
         return result
-    truncated = encoded[:_MAX_RESULT_BYTES].decode("utf-8", errors="replace")
+    # Truncate to max bytes, then decode with 'ignore' to drop any partial multibyte character at the end.
+    truncated = encoded[:_MAX_RESULT_BYTES].decode("utf-8", errors="ignore")
     return truncated + f"\n\n[... result truncated at {_MAX_RESULT_BYTES} bytes ...]"
 
 
