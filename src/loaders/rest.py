@@ -144,14 +144,15 @@ class RESTLoader:
         wrapper_code = f"async def {tool_name}({arg_str}):\n"
         wrapper_code += f"    return await tool_fn_impl(**{{{dict_entries}}})\n"
         
+        exec_globals = {"tool_fn_impl": tool_fn_impl}
         try:
             exec(wrapper_code, exec_globals)
             generated_fn = exec_globals[tool_name]
             # Register with FastMCP
             self.loader_mcp.tool(name=tool_name, description=description)(generated_fn)
         except Exception as e:
-            # Fallback for invalid names or other exec errors
-            pass
+            import sys
+            sys.stderr.write(f"Error registering REST tool {tool_name}: {str(e)}\n")
 
     def get_mcp(self) -> FastMCP:
         return self.loader_mcp
