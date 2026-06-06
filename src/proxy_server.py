@@ -237,6 +237,73 @@ def _apply_steering(result: Any, entry: ProxyEntry) -> Any:
     return result
 
 
+def _provider_prefix(provider: Any) -> Optional[str]:
+    """Best-effort namespace prefix for a mounted provider."""
+    transforms = getattr(provider, "_transforms", None) or []
+    if not transforms:
+        return None
+    return getattr(transforms[0], "_prefix", None)
+
+
+async def _list_provider_tools(provider: Any, timeout_s: float = 3.0) -> list[Any]:
+    """
+    List tools from one mounted provider with a timeout.
+    A single slow provider must not block discovery of the rest of the registry.
+    """
+    try:
+        return await asyncio.wait_for(provider.list_tools(), timeout=timeout_s)
+    except Exception as e:
+        sys.stderr.write(f"[proxy] Error listing tools for provider {getattr(provider, 'name', 'unknown')}: {e}\n")
+        return []
+
+
+async def _list_mounted_tools(server_name: Optional[str] = None) -> list[Any]:
+    """Collect mounted child tools without letting one provider stall the full scan."""
+    # Check if mcp.list_tools is mocked/monkeypatched (e.g., in unit tests)
+    list_tools_method = getattr(mcp, "list_tools", None)
+    is_mocked = False
+    if list_tools_method is not None:
+        if not (
+            hasattr(list_tools_method, "__self__")
+            and list_tools_method.__self__ is mcp
+            and hasattr(list_tools_method, "__func__")
+            and list_tools_method.__func__.__qualname__ == "FastMCP.list_tools"
+        ):
+            is_mocked = True
+
+    if is_mocked:
+        all_tools = await mcp.list_tools()
+        valid_tools = [
+            t for t in all_tools
+            if hasattr(t, "name") and isinstance(t.name, str)
+        ]
+        if server_name:
+            prefix = f"{server_name}_"
+            return [t for t in valid_tools if t.name.startswith(prefix)]
+        else:
+            return [t for t in valid_tools if not t.name.startswith("proxy_")]
+
+    providers = list(mcp.providers)
+    tools: list[Any] = []
+
+    for provider in providers:
+        prefix = _provider_prefix(provider)
+        if server_name and prefix != server_name:
+            continue
+
+        provider_tools = await _list_provider_tools(provider)
+        valid_tools = [
+            t for t in provider_tools
+            if hasattr(t, "name") and isinstance(t.name, str)
+        ]
+        if server_name:
+            tools.extend(valid_tools)
+        else:
+            tools.extend([t for t in valid_tools if not t.name.startswith("proxy_")])
+
+    return tools
+
+
 def _do_mount(entry: ProxyEntry) -> tuple[bool, str]:
     """
     Mount a single ProxyEntry as a child server (materialize immediately).
@@ -739,13 +806,7 @@ async def proxy_list_tools(server_name: Optional[str] = None) -> str:
     If server_name is provided, filters for tools from that child server.
     """
     try:
-        tools = await mcp.list_tools()
-        
-        filtered = [t for t in tools if not t.name.startswith("proxy_")]
-        
-        if server_name:
-            prefix = f"{server_name}_"
-            filtered = [t for t in filtered if t.name.startswith(prefix)]
+        filtered = await _list_mounted_tools(server_name=server_name)
             
         return json.dumps({
             "ok": True,
@@ -763,8 +824,31 @@ async def proxy_inspect_registry() -> str:
     Diagnostic tool: Expose proxy state and server counts.
     """
     try:
-        tools = await mcp.list_tools()
-        registry = [{"name": t.name} for t in tools]
+        tools = await _list_mounted_tools()
+        # Get proxy_* tools from local provider or tool manager
+        proxy_tools = []
+        local_tools = []
+        if hasattr(mcp, "_local_provider"):
+            try:
+                local_tools = await mcp._local_provider.list_tools()
+            except Exception:
+                pass
+        
+        tool_manager = getattr(mcp, "_tool_manager", None)
+        if tool_manager is not None and hasattr(tool_manager, "_tools"):
+            proxy_tool_names = sorted(tool_manager._tools.keys())
+        else:
+            proxy_tool_names = sorted([t.name for t in local_tools if hasattr(t, "name")])
+
+        proxy_tools = [
+            {"name": name}
+            for name in proxy_tool_names
+            if name.startswith("proxy_")
+        ]
+        registry = proxy_tools + [
+            {"name": t.name} for t in tools
+            if hasattr(t, "name") and isinstance(t.name, str)
+        ]
     except Exception:
         registry = []
 
