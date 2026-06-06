@@ -87,3 +87,9 @@
 **Attempted:** Running existing tests to verify catalogue loading.
 **Result:** `tests/test_config.py::test_load_config_defaults` failed because it expected `tool_budget == 50` while the implementation in `src/config.py` defaulted to `100`.
 **Lesson:** Codebase defaults may change without corresponding test updates. Always verify standard defaults in the source when tests fail after unrelated changes.
+
+### [S-15] Hardened shell installer script safety
+**Pattern:** Shell scripts doing `cd` and remote fetch/pull/sync operations are subject to timing (TOCTOU), path traversal, and untrusted execution paths if directory changes fail silently or remote configs are manipulated.
+**Fix:** Always verify `cd` success (e.g. `cd ... || fail ...`), re-validate git remote origin URLs immediately before fetching, and check that the current directory (`pwd -P`) strictly matches the expected target path before running package sync utilities like `uv sync`.
+**Status:** Resolved. Addressed Amazon Q Developer comments in `install.sh`.
+

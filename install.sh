@@ -70,7 +70,7 @@ is_project_dir() {
 validate_existing_dir() {
   local dir="$1"
   [[ -d "$dir" ]] || return 1
-  cd "$dir"
+  cd "$dir" || return 1
 
   if [[ -d ".git" ]]; then
     local origin
@@ -102,8 +102,17 @@ else
   if [[ -e "$target_dir" ]]; then
     validate_existing_dir "$target_dir" || fail "Refusing to use existing non-${REPO_NAME} directory: ${target_dir}"
     log "Updating existing checkout: ${target_dir}"
-    cd "$target_dir"
+    cd "$target_dir" || fail "Failed to change to directory: ${target_dir}"
     if [[ -d ".git" ]]; then
+      local origin
+      origin="$(git remote get-url origin 2>/dev/null || true)"
+      case "$origin" in
+        "git@github.com:${REPO_OWNER}/${REPO_NAME}.git"|"https://github.com/${REPO_OWNER}/${REPO_NAME}.git"|"https://github.com/${REPO_OWNER}/${REPO_NAME}")
+          ;;
+        *)
+          fail "Remote origin changed or is invalid: ${origin:-<none>}"
+          ;;
+      esac
       git fetch --prune origin
       current_branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
       if [[ -n "$current_branch" ]]; then
@@ -114,7 +123,7 @@ else
     mkdir -p "$(dirname "$target_dir")"
     log "Cloning ${REPO_URL} into ${target_dir}"
     git clone "$REPO_URL" "$target_dir"
-    cd "$target_dir"
+    cd "$target_dir" || fail "Failed to change to directory: ${target_dir}"
   fi
 fi
 
@@ -123,6 +132,7 @@ fi
 [[ -f "src/proxy_server.py" ]] || fail "src/proxy_server.py not found in $(pwd)"
 
 if [[ "$sync_deps" -eq 1 ]]; then
+  [[ "$(pwd -P)" == "$target_dir" ]] || fail "Working directory mismatch before dependency sync"
   log "Synchronizing Python dependencies with uv."
   uv sync
 else
