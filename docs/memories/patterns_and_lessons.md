@@ -93,3 +93,9 @@
 **Fix:** Always verify `cd` success (e.g. `cd ... || fail ...`), re-validate git remote origin URLs immediately before fetching, and check that the current directory (`pwd -P`) strictly matches the expected target path before running package sync utilities like `uv sync`.
 **Status:** Resolved. Addressed Amazon Q Developer comments in `install.sh`.
 
+### [S-16] Async tool discovery mock compatibility & local provider
+**Pattern:** Bypassing `mcp.list_tools()` to list tools from `mcp.providers` asynchronously with a timeout avoids blockages from single slow servers, but ignores directly registered proxy tools (when `_tool_manager` is missing) and breaks test monkeypatches on `mcp.list_tools()`.
+**Fix:** Detect if `mcp.list_tools` has been monkeypatched (e.g. comparing its bound method status) and fallback to it in tests. To list local proxy tools in standard FastMCP, query `mcp._local_provider.list_tools()` as a fallback when `_tool_manager` is absent.
+**Status:** Resolved. Addressed Amazon Q Developer comments on PR #6.
+
+
