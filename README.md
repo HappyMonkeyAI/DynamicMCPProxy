@@ -25,6 +25,24 @@ Catalogue servers run via `npx` (Node.js) and `uvx` (uv). These must be on the P
 
 ### Install
 
+Install with the hardened installer (clone-or-install-in-place):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SPhillips1337/DynamicMCPProxy/main/install.sh -o install.sh
+chmod +x install.sh
+./install.sh --dir "$HOME/DynamicMCPProxy"
+```
+
+If you already cloned the repository, run the installer from the project root:
+
+```bash
+./install.sh
+```
+
+The installer validates that an existing target directory is this repository before updating it, checks for required tools (`git` and `uv`), runs `uv sync`, and creates `proxy_config.json` from `proxy_config.json.example` when needed. For inspect-first installs, download and review the script before executing it; avoid piping remote scripts directly into a shell unless you trust the source.
+
+Manual install remains:
+
 ```bash
 uv sync
 ```
