@@ -486,6 +486,8 @@ Current `_apply_steering` does pick/omit/template + crude token_budget truncatio
 
 **Priority:** Tier 1 (directly multiplies value of every activated server).
 
+**Status:** Implemented (F-11). See commits and [S-19].
+
 ---
 
 ### F-12: LAP Integration for Lean Input Specs (REST Bridges & Tool Schemas)
@@ -517,6 +519,8 @@ Current `_apply_steering` does pick/omit/template + crude token_budget truncatio
 **Verification:**
 - Generate from a large OpenAPI (e.g. Stripe) → compare token count of generated config with/without LAP mode.
 - End-to-end: activate REST server with LAP → tool calls succeed with fewer context tokens.
+
+**Status:** Implemented (F-12 + F-13 starter with usage + knowledge bonus). See [S-20],[S-21],[S-22],[S-23].
 
 **Priority:** Tier 1 (improves every REST/custom API bridge and future tool schema exposure).
 
@@ -551,6 +555,8 @@ Current matcher is pure keyword/Jaccard + file ext + requirements (good but shal
 - Test: repeated successful use of a server → its score increases on next handshake.
 - Unit tests for new scoring components.
 
+**Status:** Partial (usage + knowledge boost + tools + inspect). Full persistence/structural next.
+
 **Priority:** Tier 1-2 (core value prop of "right tools for context").
 
 ---
@@ -567,6 +573,8 @@ Current matcher is pure keyword/Jaccard + file ext + requirements (good but shal
 - `docs/memories/patterns_and_lessons.md` (already started with S-18)
 - `CONTEXT.md` and `README.md` (reference the patterns book and research/ folder).
 - Optionally `research/LINKS.md` (already updated).
+
+**Status:** Partial (CONTEXT.md cross-refs added; Beever Atlas in catalogue).
 
 **Priority:** Low-code, high-documentation value.
 
