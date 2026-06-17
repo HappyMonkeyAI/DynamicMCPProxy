@@ -145,3 +145,10 @@
 **Verification:** Code paths exercised; existing activate flow unchanged.
 **Status:** Implemented. Enables dramatically leaner input specs for F-12 research goal. Update catalogue entries or use lean=True for heavy APIs.
 
+### [S-21] Knowledge-aware matcher boost (F-13 starter)
+**Pattern:** Simple keyword matcher misses when task is about "history", "team decisions", etc.; knowledge servers (Beever Atlas, memtrace-style) should rank higher.
+**Solution:** Small additive bonus in rank_servers when task_description matches knowledge keywords AND entry has matching tags (knowledge/wiki/memory/graph/rag). Easy to extend with usage stats or structural graph later.
+**Cherry-picks:** memtrace structural understanding + Beever Atlas for team knowledge; aligns with Gulli book routing/memory patterns.
+**Verification:** All matcher tests still pass.
+**Status:** Starter slice. Full self-evolving + structural to follow.
+
