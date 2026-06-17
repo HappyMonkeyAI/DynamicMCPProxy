@@ -371,6 +371,8 @@ class TestDiagnostics:
         assert "proxy_handshake" in registry_names
         assert "proxy_list_tools" in registry_names
         assert "proxy_inspect_registry" in registry_names
+        assert "usage_stats" in data  # F-13
+        assert isinstance(data["usage_stats"], dict)
 
     def test_audited_call_logs_to_audit_log(self, monkeypatch, tmp_path):
         """Calling a wrapped child tool must add an entry to the audit log."""
