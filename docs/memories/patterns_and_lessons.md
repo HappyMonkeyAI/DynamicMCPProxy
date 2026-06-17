@@ -110,4 +110,15 @@
 **Result:** Clean, minimal, convention-aligned docs surface while maintaining zero friction with the Trinity / LTM / Ratchet protocols already in force.
 **Status:** Resolved. All files verified. Follows "small slices" and "docs as source of truth".
 
+### [S-18] Incorporating targeted external research references
+**Pattern:** AI bookmarks CSV (master list of agent/MCP/tool projects) contained high-signal candidates directly applicable to proxy concerns (lazy activation, tool budget, steering, guardrails, matcher, catalogue, MCP surface design).
+**Key additions from research:**
+- Added "beever-atlas" to public `catalogue.json` (knowledge/wiki/graph MCP server with 28 tools; strong auth/rate-limit patterns).
+- Created detailed `research/github-projects/` and `research/notes/` entries for LAP (lean agent-native API contracts + compression), memtrace (MCP code KG), 9router (tool result compression), SimpleMem (lifelong memory compression), agent-sandbox (isolation), and Agentic Design Patterns book (MCP Ch.10, Guardrails Ch.18, Routing, Resource-Aware Optimization).
+- Validated catalogue load + ran config tests.
+**Alignment notes:**
+- LAP and 9router RTK directly extend ideas in [S-12] Response Steering and declarative REST ([S-14]).
+- Beever Atlas and memtrace are rich MCP servers that validate and expand the catalogue approach.
+- Gulli book provides external validation + vocabulary for guardrails, routing (matcher), resource optimization (budget/LRU), and MCP usage.
+**Status:** Resolved for initial pass. Future work may integrate compression ideas or use these as catalogue exemplars.
 

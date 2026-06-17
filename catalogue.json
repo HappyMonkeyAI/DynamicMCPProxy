@@ -967,5 +967,28 @@
     ],
     "runtime": "stdio",
     "env_vars": []
+  },
+  {
+    "name": "beever-atlas",
+    "description": "LLM-powered team wiki and knowledge graph auto-built from Slack/Discord/Teams/Mattermost chats. Features semantic + Neo4j graph memory with citations. Native MCP server (~28 tools) for discovery, retrieval, wiki pages, and graph queries. Self-host with Docker; connect via its MCP endpoint (full features require running the stack).",
+    "command": "docker run -i --rm beever-atlas python -m beever_atlas.api.mcp_server",
+    "tags": [
+      "knowledge",
+      "wiki",
+      "memory",
+      "graph",
+      "team",
+      "slack",
+      "discord",
+      "rag",
+      "context",
+      "research"
+    ],
+    "tech_stack": [
+      "any"
+    ],
+    "runtime": "stdio",
+    "env_vars": [],
+    "estimated_tools": 28
   }
 ]
