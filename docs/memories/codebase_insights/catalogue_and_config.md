@@ -1,7 +1,7 @@
 # Codebase Insight: Catalogue & Config
 
 ## catalogue.json
-50 public MCP servers (as of recent research additions). Each entry has: `name`, `description`, `command` (for stdio), `url` (for SSE/HTTP), `tags`, `tech_stack`, `runtime`, `env_vars`, and optional `estimated_tools`, steering fields.
+~60 (public + user overlay, with research additions like beever-atlas, memtrace placeholder). Each entry has: `name`, `description`, `command` (for stdio), `url` (for SSE/HTTP), `tags`, `tech_stack`, `runtime`, `env_vars`, and optional `estimated_tools`, steering fields.
 
 ## user.catalogue.json
 Private, gitignored. Contains servers from the user's existing IDE setup (antigravity mcp_config.json). Loaded and merged at startup — user entries override catalogue entries of the same name. This is where personal/local servers live (neo4j, opencode, 21st-magic, scrapling, etc.).
