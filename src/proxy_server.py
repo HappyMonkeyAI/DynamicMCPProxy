@@ -167,6 +167,70 @@ def _get_nested(data: Any, path: str) -> Any:
     return data
 
 
+def _compress_output(text: str, profile: Optional[str] = None, max_chars: Optional[int] = None) -> str:
+    """RTK-style smart compression for tool outputs.
+    Pure Python, no external deps. Inspired by 9router RTK and LAP lean ideas.
+    """
+    if not text or not isinstance(text, str):
+        return text or ""
+
+    original_len = len(text)
+
+    # 1. Basic cleanup: dedup consecutive identical lines, collapse blank lines
+    lines = text.splitlines(keepends=False)
+    cleaned = []
+    prev_line = None
+    blank_count = 0
+    for line in lines:
+        if line == prev_line and line.strip():
+            continue  # skip exact consecutive duplicates (common in logs/diffs)
+        if not line.strip():
+            blank_count += 1
+            if blank_count > 2:
+                continue
+        else:
+            blank_count = 0
+        cleaned.append(line)
+        prev_line = line
+    text = "\n".join(cleaned)
+
+    # 2. Profile-specific compression
+    profile = (profile or "").lower()
+    if profile == "git" or (not profile and ("diff --git" in text or "@@" in text)):
+        # Git diff: keep headers + only lines with + or - changes, summarize context
+        kept = []
+        for line in text.splitlines():
+            if line.startswith(("diff --git", "index ", "--- ", "+++ ", "@@")) or line.startswith(("+", "-")) and not line.startswith(("+++", "---")):
+                kept.append(line)
+            elif line.startswith(" ") and len(kept) > 0 and kept[-1].startswith(("@@", "+", "-")):
+                # keep one context line after change
+                kept.append(line[:80] + "..." if len(line) > 80 else line)
+        text = "\n".join(kept[:200])  # cap
+
+    elif profile == "log" or (not profile and any(kw in text.lower() for kw in ["error", "trace", "log"])):
+        # Log: more aggressive dedup and truncate repeats
+        seen = set()
+        deduped = []
+        for line in text.splitlines():
+            key = line.strip()[:100]
+            if key in seen and len(key) > 5:
+                continue
+            seen.add(key)
+            deduped.append(line)
+        text = "\n".join(deduped)
+
+    # 3. Final token budget aware truncate (better than pure head cut)
+    if max_chars and len(text) > max_chars:
+        head = int(max_chars * 0.65)
+        tail_start = max(0, len(text) - (max_chars - head - 30))
+        tail = text[tail_start:]
+        text = text[:head] + "\n... [compressed/truncated for token budget] ...\n" + tail
+        if len(text) > max_chars + 50:
+            text = text[:max_chars] + "\n... (truncated)"
+
+    return text
+
+
 def _apply_steering(result: Any, entry: ProxyEntry) -> Any:
     """
     Apply response shaping: pick, omit, template, and token_budget.
@@ -176,7 +240,8 @@ def _apply_steering(result: Any, entry: ProxyEntry) -> Any:
         return result
 
     # Check if we have anything to do
-    if not any([entry.pick, entry.omit, entry.template, entry.token_budget]):
+    if not any([entry.pick, entry.omit, entry.template, entry.token_budget,
+                entry.compression_profile, entry.auto_compress]):
         return result
 
     new_content = []
@@ -218,18 +283,22 @@ def _apply_steering(result: Any, entry: ProxyEntry) -> Any:
                     text = json.dumps(data, indent=2)
 
                 # 4. Token Budget (approximate chars / 4)
-                if entry.token_budget:
-                    max_chars = entry.token_budget * 4
-                    if len(text) > max_chars:
-                        text = text[:max_chars] + "\n... (truncated by token_budget)"
+                max_chars = entry.token_budget * 4 if entry.token_budget else None
+
+                # 5. Advanced compression (F-11: 9router RTK + LAP inspired)
+                if entry.compression_profile or entry.auto_compress:
+                    text = _compress_output(text, entry.compression_profile, max_chars)
+                elif max_chars and len(text) > max_chars:
+                    text = text[:max_chars] + "\n... (truncated by token_budget)"
 
                 item.text = text
             except (json.JSONDecodeError, KeyError, AttributeError, ValueError):
                 # If it's not JSON or template fails, leave as is (or apply budget only)
-                if entry.token_budget:
-                    max_chars = entry.token_budget * 4
-                    if len(item.text) > max_chars:
-                        item.text = item.text[:max_chars] + "\n... (truncated by token_budget)"
+                max_chars = entry.token_budget * 4 if entry.token_budget else None
+                if entry.compression_profile or entry.auto_compress:
+                    item.text = _compress_output(item.text, entry.compression_profile, max_chars)
+                elif max_chars and len(item.text) > max_chars:
+                    item.text = item.text[:max_chars] + "\n... (truncated by token_budget)"
         
         new_content.append(item)
 
@@ -514,6 +583,8 @@ def _catalogue_entry_to_proxy(cat: CatalogueEntry) -> Optional[ProxyEntry]:
         omit=cat.omit,
         template=cat.template,
         token_budget=cat.token_budget,
+        compression_profile=cat.compression_profile,
+        auto_compress=cat.auto_compress,
     )
 
 
@@ -1019,7 +1090,8 @@ def proxy_add_custom_proxy(
         })
 
     entry = ProxyEntry(
-        name=name, url=url, tags=tags or [], runtime=runtime, active=activate_now
+        name=name, url=url, tags=tags or [], runtime=runtime, active=activate_now,
+        compression_profile=None, auto_compress=False
     )
     save_proxy(entry, _config)
 
@@ -1044,7 +1116,7 @@ def proxy_get_metrics() -> str:
 # ---------------------------------------------------------------------------
 
 def _on_plugin_register(name: str, command: str) -> None:
-    entry = ProxyEntry(name=name, url=f"stdio://{command}", tags=[], runtime="stdio")
+    entry = ProxyEntry(name=name, url=f"stdio://{command}", tags=[], runtime="stdio", compression_profile=None, auto_compress=False)
     ok, msg = _do_mount(entry)
     sys.stderr.write(f"[plugin_scanner] {msg}\n")
 

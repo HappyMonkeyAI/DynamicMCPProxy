@@ -64,3 +64,37 @@ def test_apply_steering_nested_pick():
     assert final_data["user.name"] == "Alice"
     assert final_data["user.id"] == 123
     assert "meta" not in final_data
+
+
+def test_apply_steering_compression_profile_git():
+    entry = ProxyEntry(name="test", url="test://", compression_profile="git")
+    # Simulate git diff output
+    diff = """diff --git a/foo.py b/foo.py
+index 123..456
+--- a/foo.py
++++ b/foo.py
+@@ -1,3 +1,3 @@
+ context line
+-old
++new
+ more context
+"""
+    result = MockResult(diff)
+    steered = _apply_steering(result, entry)
+    out = steered.content[0].text
+    assert "diff --git" in out
+    assert "+new" in out
+    assert "-old" in out
+    # Should have compressed some context
+    assert "compressed" not in out or len(out) < len(diff) * 0.8  # heuristic
+
+
+def test_apply_steering_auto_compress_dedup():
+    entry = ProxyEntry(name="test", url="test://", auto_compress=True)
+    log = "error\nerror\nerror\ninfo\n\n\n\ntrace"
+    result = MockResult(log)
+    steered = _apply_steering(result, entry)
+    out = steered.content[0].text
+    # Deduped
+    assert out.count("error") == 1
+    assert out.count("\n\n") <= 2

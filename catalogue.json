@@ -18,7 +18,9 @@
     "runtime": "stdio",
     "env_vars": [
       "GITHUB_PERSONAL_ACCESS_TOKEN"
-    ]
+    ],
+    "compression_profile": "git",
+    "auto_compress": true
   },
   {
     "name": "gitlab",
