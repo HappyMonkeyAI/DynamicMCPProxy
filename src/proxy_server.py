@@ -230,6 +230,21 @@ def _compress_output(text: str, profile: Optional[str] = None, max_chars: Option
             deduped.append(line)
         text = "\n".join(deduped)
 
+    elif profile == "api" or (not profile and (text.strip().startswith("{") or text.strip().startswith("["))):
+        # API/JSON response: keep structure but truncate large arrays/strings
+        try:
+            data = json.loads(text)
+            if isinstance(data, list):
+                if len(data) > 10:
+                    data = data[:5] + ["... (truncated, " + str(len(data)-5) + " more)"] + data[-2:]
+            elif isinstance(data, dict):
+                for k in list(data.keys())[:5]:  # limit keys shown
+                    if isinstance(data[k], (str, list)) and len(str(data[k])) > 100:
+                        data[k] = str(data[k])[:100] + "..."
+            text = json.dumps(data, indent=2)
+        except:
+            pass  # fall to truncate
+
     # 3. Final token budget aware truncate (better than pure head cut)
     if max_chars and len(text) > max_chars:
         head = int(max_chars * 0.65)
