@@ -1155,6 +1155,28 @@ def proxy_get_metrics() -> str:
     return resource_health()
 
 
+@mcp.tool(name="proxy_get_usage")
+def proxy_get_usage() -> str:
+    """Return current server usage counts for self-evolving ranking (F-13)."""
+    sorted_usage = dict(sorted(_server_usage.items(), key=lambda x: -x[1]))
+    return json.dumps({
+        "ok": True,
+        "usage": sorted_usage,
+        "note": "Higher usage boosts ranking in future handshakes."
+    }, indent=2)
+
+
+@mcp.tool(name="proxy_reset_usage")
+def proxy_reset_usage(server: str | None = None) -> str:
+    """Reset usage stats (all or for one server). Useful for testing or re-baselining."""
+    if server:
+        _server_usage.pop(server, None)
+        return json.dumps({"ok": True, "message": f"Reset usage for {server}"})
+    else:
+        _server_usage.clear()
+        return json.dumps({"ok": True, "message": "All usage stats reset."})
+
+
 # ---------------------------------------------------------------------------
 # Startup: mount persisted proxies + scan plugins
 # ---------------------------------------------------------------------------

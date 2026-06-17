@@ -158,3 +158,9 @@
 **Verification:** New test passes; no impact on other ranking tests.
 **Status:** In-memory for this slice. Persistence via proxy_config or separate can follow.
 
+### [S-23] Usage inspection and reset tools (F-13)
+**Pattern:** Need visibility and control over the self-evolving stats for debugging and reset.
+**Solution:** Added proxy_get_usage() and proxy_reset_usage() (all or per-server).
+**Verification:** New tools follow naming convention; no stdout issues.
+**Status:** Complements the usage tracking.
+
