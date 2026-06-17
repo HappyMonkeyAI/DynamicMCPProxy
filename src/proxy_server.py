@@ -935,7 +935,8 @@ async def proxy_inspect_registry() -> str:
         "status": "ok",
         "active_servers": list(_active_servers.keys()),
         "total_tools": len(registry),
-        "registry": registry
+        "registry": registry,
+        "usage_stats": dict(sorted(_server_usage.items(), key=lambda x: -x[1])[:10])  # top used
     }, indent=2)
 
 
