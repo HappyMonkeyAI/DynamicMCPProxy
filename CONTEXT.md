@@ -72,5 +72,6 @@ See full records in `docs/memories/architectural_decisions/` and patterns.
 - **Tests**: Many use tmp_path isolation and monkeypatch detection. Run with `uv run pytest`.
 - **Catalogue updates**: `uv run python scripts/sync_catalogue.py`.
 - When adding features, also consider impact on `proxy_inspect_registry`, metrics, and guardrails.
+- Research alignments (see research/ notes): LAP for lean specs, 9router-style output compression, memtrace/Beever for knowledge servers + structural matching, Gulli "Agentic Design Patterns" book (Ch.10 MCP, Ch.18 Guardrails, routing, resource optimization).
 
 Use the docs (CONTEXT + AGENTS + memories/) as the source of truth for future work. Update them in the same change when decisions shift.
