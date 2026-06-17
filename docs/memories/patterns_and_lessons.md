@@ -166,3 +166,9 @@
 
 F-13 (usage + knowledge + persist + inspect/reset) is now substantially complete. Self-evolving ranking is live (in-memory + persisted on key events). Ready for structural enhancements from memtrace research.
 
+### [S-24] Memtrace placeholder in catalogue (F-14)
+**Pattern:** High-value research MCP servers (e.g. memtrace code KG with 25+ tools) should be discoverable via catalogue/matcher.
+**Solution:** Added memtrace placeholder entry (noted as private beta per research note).
+**Verification:** Loads cleanly.
+**Status:** Part of F-14 catalogue expansion.
+
