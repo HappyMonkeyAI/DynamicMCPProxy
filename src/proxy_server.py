@@ -238,9 +238,12 @@ def _compress_output(text: str, profile: Optional[str] = None, max_chars: Option
                 if len(data) > 10:
                     data = data[:5] + ["... (truncated, " + str(len(data)-5) + " more)"] + data[-2:]
             elif isinstance(data, dict):
-                for k in list(data.keys())[:5]:  # limit keys shown
-                    if isinstance(data[k], (str, list)) and len(str(data[k])) > 100:
-                        data[k] = str(data[k])[:100] + "..."
+                for k in list(data.keys()):
+                    v = data[k]
+                    if isinstance(v, list) and len(v) > 10:
+                        data[k] = v[:5] + ["... (truncated)"] + v[-2:]
+                    elif isinstance(v, str) and len(v) > 100:
+                        data[k] = v[:100] + "..."
             text = json.dumps(data, indent=2)
         except:
             pass  # fall to truncate

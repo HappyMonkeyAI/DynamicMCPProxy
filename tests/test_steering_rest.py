@@ -98,3 +98,15 @@ def test_apply_steering_auto_compress_dedup():
     # Deduped
     assert out.count("error") == 1
     assert out.count("\n\n") <= 2
+
+
+def test_apply_steering_api_profile():
+    entry = ProxyEntry(name="test", url="test://", compression_profile="api")
+    data = {"items": list(range(20)), "long": "x" * 200, "meta": "keep"}
+    result = MockResult(json.dumps(data))
+    steered = _apply_steering(result, entry)
+    out = steered.content[0].text
+    parsed = json.loads(out)
+    assert len(parsed["items"]) < 20  # truncated list
+    assert "..." in str(parsed.get("items", []))
+    assert "..." in parsed.get("long", "")
