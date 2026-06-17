@@ -1,5 +1,7 @@
 # AGENTS.md — Dynamic MCP Proxy
 
+This is the canonical agent guide and workflow protocol (HERMES equivalent).
+
 Extends the [Anti-Gravity Agents Prompt Protocol](https://github.com/SPhillips1337/AntigravityAgentsPromptProtocol).
 
 ---

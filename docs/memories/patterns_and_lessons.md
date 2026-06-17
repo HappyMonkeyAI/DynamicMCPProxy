@@ -98,4 +98,16 @@
 **Fix:** Detect if `mcp.list_tools` has been monkeypatched (e.g. comparing its bound method status) and fallback to it in tests. To list local proxy tools in standard FastMCP, query `mcp._local_provider.list_tools()` as a fallback when `_tool_manager` is absent.
 **Status:** Resolved. Addressed Amazon Q Developer comments on PR #6.
 
+### [S-17] Documentation structure bootstrap (CONTEXT + research + HERMES alignment)
+**Pattern:** Following a documentation setup prompt (setup-prompt.txt) in an existing project with strong custom LTM conventions.
+**Actions:**
+- Created root `CONTEXT.md` (stack assumptions, non-negotiable rules, workflows, resolved decisions, what-not-to-do, project guidance).
+- Created `HERMES.md` (thin canonical pointer) while keeping `AGENTS.md` as the authoritative agent protocol (with small header clarification).
+- Created full `research/` folder: README, LINKS, templates/project-note.md, plus initial notes for the motivating claude-code issue, FastMCP pattern, and mcp-gateway comparison.
+- Created `docs/adr/README.md` for convention compatibility without moving or duplicating the real decisions (which remain in `docs/memories/architectural_decisions/`).
+- Refined `README.md` (catalogue count, added explicit "Repository Documentation" section, clarified LTM paths).
+- Preserved the existing `docs/memories/` structure and all AGENTS.md LTM rules.
+**Result:** Clean, minimal, convention-aligned docs surface while maintaining zero friction with the Trinity / LTM / Ratchet protocols already in force.
+**Status:** Resolved. All files verified. Follows "small slices" and "docs as source of truth".
+
 

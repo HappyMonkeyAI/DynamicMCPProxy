@@ -119,7 +119,7 @@ Adjust `PATH` to match your system (`type npx` and `type uvx` show the right dir
 
 ## Catalogue
 
-`catalogue.json` \u2014 46 public MCP servers (GitHub, Docker, Postgres, Slack, Stripe, etc.).
+`catalogue.json` — 49 public MCP servers (GitHub, Docker, Postgres, Slack, Stripe, etc.).
 
 `user.catalogue.json` — your private overlay (gitignored). Add personal servers here — local paths, private APIs, custom tools. Entries with the same name override the public catalogue.
 
@@ -232,13 +232,21 @@ curl -X POST http://localhost:8765/handshake \
 
 ## Long-Term Memory
 
-This project uses the Anti-Gravity LTM protocol. Agent context lives in `.antigravity/memories/` (gitignored — local to each developer):
+This project uses the Anti-Gravity LTM protocol. The repo ships canonical memory in `docs/memories/`. Per-developer context lives in `.antigravity/memories/` (gitignored):
 
 - `patterns_and_lessons.md` — solved problems, failure post-mortems
 - `codebase_insights/` — module-level hidden knowledge
 - `architectural_decisions/` — design tradeoffs and rationale
 
 Bootstrap your local LTM by following [BOOTSTRAP.md](https://github.com/SPhillips1337/AntigravityAgentsPromptProtocol/blob/main/BOOTSTRAP.md) from the protocol repo. See `AGENTS.md` for the full agent protocol.
+
+## Repository Documentation
+
+- `README.md` — user overview and getting started
+- `CONTEXT.md` — concise operating manual (stack, rules, decisions, guidance)
+- `AGENTS.md` — agent behavior, workflow rules, and LTM protocol (HERMES equivalent)
+- `docs/memories/` — living memory: patterns, insights, architectural decisions
+- `research/` — external references, comparisons, and notes (not source of truth)
 
 ## Related Work & Problem Context
 
