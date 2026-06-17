@@ -185,3 +185,9 @@ F-13 (usage + knowledge + persist + inspect/reset) is now substantially complete
 **Verification:** Code paths covered indirectly.
 **Status:** Part of caching slice.
 
+### [S-27] Address bare except in _compress_output (Amazon Q review on PR #7)
+**Pattern:** Bare `except:` clause in the api profile path of _compress_output silently suppressed JSONDecodeError/ValueError during compression, hiding failures when tool responses were malformed JSON. This hindered debugging.
+**Fix:** Changed to `except (json.JSONDecodeError, ValueError) as e:` and added logging via `sys.stderr.write(f"[proxy] JSON compression failed for api profile: {e}\n")` before falling back to truncation. This matches the suggested fix from the Amazon Q developer review.
+**Verification:** Directly addresses the critical finding in the code review on PR #7. Existing tests continue to pass; failure path now observable in stderr (consistent with stdout discipline).
+**Status:** Resolved. Follows previous pattern of addressing Amazon Q comments (see S-?? for PR #6).
+

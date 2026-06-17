@@ -250,7 +250,8 @@ def _compress_output(text: str, profile: Optional[str] = None, max_chars: Option
                     elif isinstance(v, str) and len(v) > 100:
                         data[k] = v[:100] + "..."
             text = json.dumps(data, indent=2)
-        except:
+        except (json.JSONDecodeError, ValueError) as e:
+            sys.stderr.write(f"[proxy] JSON compression failed for api profile: {e}\n")
             pass  # fall to truncate
 
     # 3. Final token budget aware truncate (better than pure head cut)
