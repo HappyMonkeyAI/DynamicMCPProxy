@@ -21,3 +21,6 @@ The `ProjectContext` dataclass captures:
 - `task_description`: Free-text description of the work.
 - `open_files`: Currently active files in the IDE.
 - `requirements`: List of project dependencies.
+
+## Search (F-15)
+Added `search_servers(query, ...)` for on-demand discovery. Uses description match (heavily weighted), tag/name overlap + reuses F-13 usage/knowledge bonuses. Returns RankedEntry list. Used by `proxy_search_tools` to let AI find servers without full context load.

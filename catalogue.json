@@ -18,7 +18,9 @@
     "runtime": "stdio",
     "env_vars": [
       "GITHUB_PERSONAL_ACCESS_TOKEN"
-    ]
+    ],
+    "compression_profile": "git",
+    "auto_compress": true
   },
   {
     "name": "gitlab",
@@ -967,5 +969,46 @@
     ],
     "runtime": "stdio",
     "env_vars": []
+  },
+  {
+    "name": "beever-atlas",
+    "description": "LLM-powered team wiki and knowledge graph auto-built from Slack/Discord/Teams/Mattermost chats. Features semantic + Neo4j graph memory with citations. Native MCP server (~28 tools) for discovery, retrieval, wiki pages, and graph queries. Self-host with Docker; connect via its MCP endpoint (full features require running the stack).",
+    "command": "docker run -i --rm beever-atlas python -m beever_atlas.api.mcp_server",
+    "tags": [
+      "knowledge",
+      "wiki",
+      "memory",
+      "graph",
+      "team",
+      "slack",
+      "discord",
+      "rag",
+      "context",
+      "research"
+    ],
+    "tech_stack": [
+      "any"
+    ],
+    "runtime": "stdio",
+    "env_vars": [],
+    "estimated_tools": 28
+  },
+  {
+    "name": "memtrace",
+    "description": "Structural + bi-temporal code knowledge graph for AI coding agents (Rust+Tree-sitter, 25+ MCP tools). Fast local indexing, no LLM calls for graph. (Private beta; see research notes. Placeholder until public.)",
+    "tags": [
+      "code",
+      "knowledge_graph",
+      "memory",
+      "refactor",
+      "impact",
+      "research"
+    ],
+    "tech_stack": [
+      "any"
+    ],
+    "runtime": "stdio",
+    "env_vars": [],
+    "estimated_tools": 25
   }
 ]

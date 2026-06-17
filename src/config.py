@@ -43,6 +43,9 @@ class ProxyEntry(BaseModel):
     omit: list[str] = Field(default_factory=list, description="Fields to omit from the tool response")
     template: Optional[str] = Field(None, description="Formatting template for the response")
     token_budget: Optional[int] = Field(None, description="Max tokens (approx) for the tool response")
+    # Compression profile for advanced tool result compression (e.g. "git", "log", "auto")
+    compression_profile: Optional[str] = Field(None, description="Profile for smart output compression (rtk-style)")
+    auto_compress: bool = Field(False, description="Enable automatic heuristic compression")
 
 
 class AppConfig(BaseModel):
@@ -69,6 +72,9 @@ class AppConfig(BaseModel):
     # Registered proxies (persisted)
     proxies: list[ProxyEntry] = Field(default_factory=list)
 
+    # Usage stats for self-evolving (F-13, persisted optionally)
+    usage_stats: dict[str, int] = Field(default_factory=dict)
+
 
 class CatalogueEntry(BaseModel):
     """A single entry in the bundled MCP server catalogue."""
@@ -91,6 +97,9 @@ class CatalogueEntry(BaseModel):
     omit: list[str] = Field(default_factory=list)
     template: Optional[str] = None
     token_budget: Optional[int] = None
+    # Compression profile for advanced tool result compression (e.g. "git", "log", "auto")
+    compression_profile: Optional[str] = None
+    auto_compress: bool = False
     # Path to a 40mcp-style REST bridge JSON config (for runtime="rest")
     config_path: Optional[str] = None
 

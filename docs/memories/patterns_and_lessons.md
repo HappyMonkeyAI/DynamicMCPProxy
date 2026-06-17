@@ -98,4 +98,96 @@
 **Fix:** Detect if `mcp.list_tools` has been monkeypatched (e.g. comparing its bound method status) and fallback to it in tests. To list local proxy tools in standard FastMCP, query `mcp._local_provider.list_tools()` as a fallback when `_tool_manager` is absent.
 **Status:** Resolved. Addressed Amazon Q Developer comments on PR #6.
 
+### [S-17] Documentation structure bootstrap (CONTEXT + research + HERMES alignment)
+**Pattern:** Following a documentation setup prompt (setup-prompt.txt) in an existing project with strong custom LTM conventions.
+**Actions:**
+- Created root `CONTEXT.md` (stack assumptions, non-negotiable rules, workflows, resolved decisions, what-not-to-do, project guidance).
+- Created `HERMES.md` (thin canonical pointer) while keeping `AGENTS.md` as the authoritative agent protocol (with small header clarification).
+- Created full `research/` folder: README, LINKS, templates/project-note.md, plus initial notes for the motivating claude-code issue, FastMCP pattern, and mcp-gateway comparison.
+- Created `docs/adr/README.md` for convention compatibility without moving or duplicating the real decisions (which remain in `docs/memories/architectural_decisions/`).
+- Refined `README.md` (catalogue count, added explicit "Repository Documentation" section, clarified LTM paths).
+- Preserved the existing `docs/memories/` structure and all AGENTS.md LTM rules.
+**Result:** Clean, minimal, convention-aligned docs surface while maintaining zero friction with the Trinity / LTM / Ratchet protocols already in force.
+**Status:** Resolved. All files verified. Follows "small slices" and "docs as source of truth".
+
+### [S-18] Incorporating targeted external research references
+**Pattern:** AI bookmarks CSV (master list of agent/MCP/tool projects) contained high-signal candidates directly applicable to proxy concerns (lazy activation, tool budget, steering, guardrails, matcher, catalogue, MCP surface design).
+**Key additions from research:**
+- Added "beever-atlas" to public `catalogue.json` (knowledge/wiki/graph MCP server with 28 tools; strong auth/rate-limit patterns).
+- Created detailed `research/github-projects/` and `research/notes/` entries for LAP (lean agent-native API contracts + compression), memtrace (MCP code KG), 9router (tool result compression), SimpleMem (lifelong memory compression), agent-sandbox (isolation), and Agentic Design Patterns book (MCP Ch.10, Guardrails Ch.18, Routing, Resource-Aware Optimization).
+- Validated catalogue load + ran config tests.
+**Alignment notes:**
+- LAP and 9router RTK directly extend ideas in [S-12] Response Steering and declarative REST ([S-14]).
+- Beever Atlas and memtrace are rich MCP servers that validate and expand the catalogue approach.
+- Gulli book provides external validation + vocabulary for guardrails, routing (matcher), resource optimization (budget/LRU), and MCP usage.
+**Status:** Resolved for initial pass. Future work may integrate compression ideas or use these as catalogue exemplars.
+
+### [S-19] Advanced output compression for tool results (F-11)
+**Pattern:** Tool responses (especially from git, logs, large APIs) are major context consumers even after pick/omit. Simple char truncation loses signal.
+**Solution:** Added `compression_profile` and `auto_compress` to ProxyEntry/CatalogueEntry. Implemented `_compress_output` with:
+- Consecutive line dedup + blank collapse
+- Profile-aware: "git" keeps diffs + headers, "log" dedups aggressively
+- Smart truncate (head + tail) when budget active
+- Integrated into `_apply_steering` without breaking existing pick/omit/template/token_budget
+- Seeded example on github entry
+- Enhanced with 'api' profile for nested list/string truncation in JSON responses (F-11)
+**Cherry-picks:** 9router RTK techniques for tool_result compression + LAP lean-mode philosophy.
+**Verification:** Extended tests pass; preserves behavior for old fields.
+**Status:** Implemented as first slice of research round 2. Preserves stdout discipline.
+
+### [S-20] LAP lean spec support in proxy_activate_from_spec (F-12)
+**Pattern:** Generating REST bridges via 40mcp from full OpenAPI/GraphQL specs produces verbose configs that bloat context, similar to problems solved by LAP.
+**Solution:** Extended `proxy_activate_from_spec` with `lean: bool = False`. When enabled:
+- Attempts to use `npx @lap-platform/lapsh compile --lean` then `convert` to produce leaner OpenAPI input.
+- Falls back silently to original spec if LAP CLI unavailable or fails (no new deps, graceful).
+- Updates generated entry description to note "(LAP lean)".
+- Results in smaller `configs/*.json` and thus leaner tool schemas exposed via RESTLoader.
+**Cherry-picks:** LAP's semantic compression (5-40x on verbose specs), typed lean contracts, and explicit complementarity to MCP ("LAP compresses the documentation").
+**Verification:** Code paths exercised; existing activate flow unchanged.
+**Status:** Implemented. Enables dramatically leaner input specs for F-12 research goal. Update catalogue entries or use lean=True for heavy APIs.
+
+### [S-21] Knowledge-aware matcher boost (F-13 starter)
+**Pattern:** Simple keyword matcher misses when task is about "history", "team decisions", etc.; knowledge servers (Beever Atlas, memtrace-style) should rank higher.
+**Solution:** Small additive bonus in rank_servers when task_description matches knowledge keywords AND entry has matching tags (knowledge/wiki/memory/graph/rag). Easy to extend with usage stats or structural graph later.
+**Cherry-picks:** memtrace structural understanding + Beever Atlas for team knowledge; aligns with Gulli book routing/memory patterns.
+**Verification:** All matcher tests still pass.
+**Status:** Starter slice. Full self-evolving + structural to follow.
+
+### [S-22] Basic usage tracking for self-evolving ranking (F-13)
+**Pattern:** Without remembering which servers were useful, the matcher stays static. Frequent use should increase future relevance.
+**Solution:** Added module-level _server_usage (increment on successful mount + tool calls in audited_call). Passed to rank_servers as optional usage dict for additive boost (capped diminishing returns). Knowledge bonus (S-21) + usage now work together.
+**Verification:** New test passes; no impact on other ranking tests.
+**Status:** In-memory for this slice. Persistence via proxy_config or separate can follow. Persist on mounts and every 5th tool call to balance I/O.
+
+### [S-23] Usage inspection and reset tools (F-13)
+**Pattern:** Need visibility and control over the self-evolving stats for debugging and reset.
+**Solution:** Added proxy_get_usage() and proxy_reset_usage() (all or per-server).
+**Verification:** New tools follow naming convention; no stdout issues.
+**Status:** Complements the usage tracking.
+
+F-13 (usage + knowledge + persist + inspect/reset) is now substantially complete. Self-evolving ranking is live (in-memory + persisted on key events). Ready for structural enhancements from memtrace research.
+
+### [S-24] Memtrace placeholder in catalogue (F-14)
+**Pattern:** High-value research MCP servers (e.g. memtrace code KG with 25+ tools) should be discoverable via catalogue/matcher.
+**Solution:** Added memtrace placeholder entry (noted as private beta per research note).
+**Verification:** Loads cleanly.
+**Status:** Part of F-14 catalogue expansion.
+
+### [S-25] On-demand tool search for lazy discovery (F-15)
+**Pattern:** Loading full tool catalogues or even ranked lists upfront wastes context; AI should discover relevant servers on-demand via search query.
+**Solution:** Added search_servers() in matcher (hybrid desc/tag/name + reuse of usage/knowledge boosts) and proxy_search_tools(query, limit) tool. Returns scored matches without activation. Aligns with Anthropic Tool Search, Stacklok Optimizer, lazy/passive server patterns seen in research.
+**Verification:** New tests pass.
+**Status:** First slice of F-15. Enables "search then activate" workflow on top of existing lazy stubs and usage self-evolution.
+
+### [S-26] Tool list caching to reduce discovery overhead (F-15)
+**Pattern:** Repeated list_tools() and capability discovery cause cold starts and latency (common in MCP research).
+**Solution:** Added simple TTL cache in _list_provider_tools (5min). Invalidate on mount/unmount. Complements search for efficient on-demand.
+**Verification:** Code paths covered indirectly.
+**Status:** Part of caching slice.
+
+### [S-27] Address bare except in _compress_output (Amazon Q review on PR #7)
+**Pattern:** Bare `except:` clause in the api profile path of _compress_output silently suppressed JSONDecodeError/ValueError during compression, hiding failures when tool responses were malformed JSON. This hindered debugging.
+**Fix:** Changed to `except (json.JSONDecodeError, ValueError) as e:` and added logging via `sys.stderr.write(f"[proxy] JSON compression failed for api profile: {e}\n")` before falling back to truncation. This matches the suggested fix from the Amazon Q developer review.
+**Verification:** Directly addresses the critical finding in the code review on PR #7. Existing tests continue to pass; failure path now observable in stderr (consistent with stdout discipline).
+**Status:** Resolved. Follows previous pattern of addressing Amazon Q comments (see S-?? for PR #6).
 

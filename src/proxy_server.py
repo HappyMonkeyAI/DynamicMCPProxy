@@ -27,9 +27,10 @@ import os
 import platform
 import shlex
 import sys
+import tempfile
 import threading
 import time
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -61,7 +62,7 @@ from .guardrails import (
     scan_tool_description,
     truncate_result,
 )
-from .matcher import ProjectContext, rank_servers
+from .matcher import ProjectContext, rank_servers, search_servers
 from .plugin_scanner import PluginScanner
 from .loaders.rest import RESTLoader
 
@@ -81,6 +82,21 @@ _lock = threading.Lock()
 # Pending (deferred) servers: registered but not yet materialised.
 # key = server name, value = CatalogueEntry or ProxyEntry
 _pending_servers: dict[str, Any] = {}
+
+# In-memory usage stats for self-evolving matcher (F-13)
+# server name -> number of successful activations / tool calls
+_server_usage: dict[str, int] = defaultdict(int)
+
+# Simple cache for tool lists to reduce repeated discovery / cold start costs (F-15 research)
+# key: provider prefix or name -> (list_of_tools, timestamp)
+_tool_list_cache: dict[str, tuple[list, float]] = {}
+_TOOL_CACHE_TTL = 300.0  # 5 min
+
+def _persist_usage() -> None:
+    """Persist current usage stats to config (for self-evolving across restarts)."""
+    global _config
+    _config.usage_stats = dict(_server_usage)
+    save_config(_config)
 
 mcp = FastMCP(
     name="Dynamic MCP Proxy",
@@ -167,6 +183,89 @@ def _get_nested(data: Any, path: str) -> Any:
     return data
 
 
+def _compress_output(text: str, profile: Optional[str] = None, max_chars: Optional[int] = None) -> str:
+    """RTK-style smart compression for tool outputs.
+    Pure Python, no external deps. Inspired by 9router RTK and LAP lean ideas.
+    """
+    if not text or not isinstance(text, str):
+        return text or ""
+
+    original_len = len(text)
+
+    # 1. Basic cleanup: dedup consecutive identical lines, collapse blank lines
+    lines = text.splitlines(keepends=False)
+    cleaned = []
+    prev_line = None
+    blank_count = 0
+    for line in lines:
+        if line == prev_line and line.strip():
+            continue  # skip exact consecutive duplicates (common in logs/diffs)
+        if not line.strip():
+            blank_count += 1
+            if blank_count > 2:
+                continue
+        else:
+            blank_count = 0
+        cleaned.append(line)
+        prev_line = line
+    text = "\n".join(cleaned)
+
+    # 2. Profile-specific compression
+    profile = (profile or "").lower()
+    if profile == "git" or (not profile and ("diff --git" in text or "@@" in text)):
+        # Git diff: keep headers + only lines with + or - changes, summarize context
+        kept = []
+        for line in text.splitlines():
+            if line.startswith(("diff --git", "index ", "--- ", "+++ ", "@@")) or line.startswith(("+", "-")) and not line.startswith(("+++", "---")):
+                kept.append(line)
+            elif line.startswith(" ") and len(kept) > 0 and kept[-1].startswith(("@@", "+", "-")):
+                # keep one context line after change
+                kept.append(line[:80] + "..." if len(line) > 80 else line)
+        text = "\n".join(kept[:200])  # cap
+
+    elif profile == "log" or (not profile and any(kw in text.lower() for kw in ["error", "trace", "log"])):
+        # Log: more aggressive dedup and truncate repeats
+        seen = set()
+        deduped = []
+        for line in text.splitlines():
+            key = line.strip()[:100]
+            if key in seen and len(key) > 5:
+                continue
+            seen.add(key)
+            deduped.append(line)
+        text = "\n".join(deduped)
+
+    elif profile == "api" or (not profile and (text.strip().startswith("{") or text.strip().startswith("["))):
+        # API/JSON response: keep structure but truncate large arrays/strings
+        try:
+            data = json.loads(text)
+            if isinstance(data, list):
+                if len(data) > 10:
+                    data = data[:5] + ["... (truncated, " + str(len(data)-5) + " more)"] + data[-2:]
+            elif isinstance(data, dict):
+                for k in list(data.keys()):
+                    v = data[k]
+                    if isinstance(v, list) and len(v) > 10:
+                        data[k] = v[:5] + ["... (truncated)"] + v[-2:]
+                    elif isinstance(v, str) and len(v) > 100:
+                        data[k] = v[:100] + "..."
+            text = json.dumps(data, indent=2)
+        except (json.JSONDecodeError, ValueError) as e:
+            sys.stderr.write(f"[proxy] JSON compression failed for api profile: {e}\n")
+            pass  # fall to truncate
+
+    # 3. Final token budget aware truncate (better than pure head cut)
+    if max_chars and len(text) > max_chars:
+        head = int(max_chars * 0.65)
+        tail_start = max(0, len(text) - (max_chars - head - 30))
+        tail = text[tail_start:]
+        text = text[:head] + "\n... [compressed/truncated for token budget] ...\n" + tail
+        if len(text) > max_chars + 50:
+            text = text[:max_chars] + "\n... (truncated)"
+
+    return text
+
+
 def _apply_steering(result: Any, entry: ProxyEntry) -> Any:
     """
     Apply response shaping: pick, omit, template, and token_budget.
@@ -176,7 +275,8 @@ def _apply_steering(result: Any, entry: ProxyEntry) -> Any:
         return result
 
     # Check if we have anything to do
-    if not any([entry.pick, entry.omit, entry.template, entry.token_budget]):
+    if not any([entry.pick, entry.omit, entry.template, entry.token_budget,
+                entry.compression_profile, entry.auto_compress]):
         return result
 
     new_content = []
@@ -218,18 +318,22 @@ def _apply_steering(result: Any, entry: ProxyEntry) -> Any:
                     text = json.dumps(data, indent=2)
 
                 # 4. Token Budget (approximate chars / 4)
-                if entry.token_budget:
-                    max_chars = entry.token_budget * 4
-                    if len(text) > max_chars:
-                        text = text[:max_chars] + "\n... (truncated by token_budget)"
+                max_chars = entry.token_budget * 4 if entry.token_budget else None
+
+                # 5. Advanced compression (F-11: 9router RTK + LAP inspired)
+                if entry.compression_profile or entry.auto_compress:
+                    text = _compress_output(text, entry.compression_profile, max_chars)
+                elif max_chars and len(text) > max_chars:
+                    text = text[:max_chars] + "\n... (truncated by token_budget)"
 
                 item.text = text
             except (json.JSONDecodeError, KeyError, AttributeError, ValueError):
                 # If it's not JSON or template fails, leave as is (or apply budget only)
-                if entry.token_budget:
-                    max_chars = entry.token_budget * 4
-                    if len(item.text) > max_chars:
-                        item.text = item.text[:max_chars] + "\n... (truncated by token_budget)"
+                max_chars = entry.token_budget * 4 if entry.token_budget else None
+                if entry.compression_profile or entry.auto_compress:
+                    item.text = _compress_output(item.text, entry.compression_profile, max_chars)
+                elif max_chars and len(item.text) > max_chars:
+                    item.text = item.text[:max_chars] + "\n... (truncated by token_budget)"
         
         new_content.append(item)
 
@@ -249,9 +353,19 @@ async def _list_provider_tools(provider: Any, timeout_s: float = 3.0) -> list[An
     """
     List tools from one mounted provider with a timeout.
     A single slow provider must not block discovery of the rest of the registry.
+    Caches results briefly to mitigate repeated discovery costs (research on cold starts).
     """
+    prefix = _provider_prefix(provider) or getattr(provider, "name", "unknown")
+    now = time.monotonic()
+    if prefix in _tool_list_cache:
+        tools, ts = _tool_list_cache[prefix]
+        if now - ts < _TOOL_CACHE_TTL:
+            return tools
+
     try:
-        return await asyncio.wait_for(provider.list_tools(), timeout=timeout_s)
+        tools = await asyncio.wait_for(provider.list_tools(), timeout=timeout_s)
+        _tool_list_cache[prefix] = (tools, now)
+        return tools
     except Exception as e:
         sys.stderr.write(f"[proxy] Error listing tools for provider {getattr(provider, 'name', 'unknown')}: {e}\n")
         return []
@@ -347,6 +461,10 @@ def _do_mount(entry: ProxyEntry) -> tuple[bool, str]:
                 raise
             finally:
                 latency = (time.monotonic() - start_time) * 1000
+                if outcome == "ok":
+                    _server_usage[entry.name] += 1
+                    if _server_usage[entry.name] % 5 == 0:
+                        _persist_usage()
                 audit(
                     tool=f"{entry.name}_{name}" if not name.startswith(f"{entry.name}_") else name,
                     outcome=outcome,
@@ -361,6 +479,9 @@ def _do_mount(entry: ProxyEntry) -> tuple[bool, str]:
         with _lock:
             _active_servers[entry.name] = (entry, proxy, estimated)
             _active_servers.move_to_end(entry.name)
+            _server_usage[entry.name] += 1
+            _persist_usage()
+            _tool_list_cache.pop(entry.name, None)  # invalidate cache on (re)mount
 
         return True, f"Mounted '{entry.name}' ({estimated} tools estimated)."
     except Exception as exc:
@@ -468,6 +589,7 @@ def _do_unmount(name: str) -> tuple[bool, str]:
                 return True, f"Cleared pending entry '{name}'."
 
         _active_servers.pop(name, None)
+        _tool_list_cache.pop(name, None)  # clear cache
         
     # fastmcp doesn't have a public unmount API yet
     # We remove it from providers map directly
@@ -514,6 +636,8 @@ def _catalogue_entry_to_proxy(cat: CatalogueEntry) -> Optional[ProxyEntry]:
         omit=cat.omit,
         template=cat.template,
         token_budget=cat.token_budget,
+        compression_profile=cat.compression_profile,
+        auto_compress=cat.auto_compress,
     )
 
 
@@ -687,7 +811,7 @@ def proxy_handshake(
         requirements=requirements or [],
     )
 
-    ranked = rank_servers(context, _catalogue, top_k=5)
+    ranked = rank_servers(context, _catalogue, top_k=5, usage=dict(_server_usage))
     activated: list[str] = []
     skipped: list[str] = []
 
@@ -776,13 +900,17 @@ def proxy_list_available_servers(filter_tag: str = "") -> str:
     List MCP servers in the catalogue that are not yet mounted.
 
     Args:
-        filter_tag: Optional tag to filter by (e.g. "database", "search")
+        filter_tag: Optional tag filter, or free-text query (uses search_servers for discovery).
     """
-    available = [
-        cat for cat in _catalogue
-        if cat.name not in _active_servers
-        and (not filter_tag or filter_tag.lower() in [t.lower() for t in cat.tags])
-    ]
+    if filter_tag:
+        # Use search for richer query support (F-15)
+        results = search_servers(filter_tag, _catalogue, limit=20, usage=dict(_server_usage))
+        available = [r.entry for r in results if r.entry.name not in _active_servers]
+    else:
+        available = [
+            cat for cat in _catalogue
+            if cat.name not in _active_servers
+        ]
     return json.dumps({
         "available_servers": [
             {
@@ -796,6 +924,48 @@ def proxy_list_available_servers(filter_tag: str = "") -> str:
             for c in available
         ],
         "count": len(available),
+    }, indent=2)
+
+
+@mcp.tool(name="proxy_search_tools")
+def proxy_search_tools(query: str, limit: int = 10) -> str:
+    """
+    Search the catalogue for relevant servers/tools using free-text query.
+    Enables on-demand discovery (lazy loading pattern) so the AI can find
+    specific capabilities without the full catalogue bloating context.
+
+    Returns ranked list of matching servers (name, desc, score, tags).
+    Use proxy_activate_server on results, or let handshake do it.
+
+    Inspired by MCP tool search / lazy discovery best practices (Anthropic, Stacklok, etc.).
+    """
+    if not query or not query.strip():
+        return json.dumps({"ok": False, "error": "Query required."})
+
+    results = search_servers(
+        query.strip(),
+        _catalogue,
+        limit=limit,
+        usage=dict(_server_usage),
+    )
+
+    return json.dumps({
+        "ok": True,
+        "query": query,
+        "results": [
+            {
+                "name": r.entry.name,
+                "description": r.entry.description,
+                "tags": r.entry.tags,
+                "tech_stack": r.entry.tech_stack,
+                "runtime": r.entry.runtime,
+                "score": r.score,
+                "estimated_tools": getattr(r.entry, "estimated_tools", 10),
+            }
+            for r in results
+        ],
+        "count": len(results),
+        "note": "Activate with proxy_activate_server(name) or rely on proxy_handshake for auto.",
     }, indent=2)
 
 
@@ -856,7 +1026,8 @@ async def proxy_inspect_registry() -> str:
         "status": "ok",
         "active_servers": list(_active_servers.keys()),
         "total_tools": len(registry),
-        "registry": registry
+        "registry": registry,
+        "usage_stats": dict(sorted(_server_usage.items(), key=lambda x: -x[1])[:10])  # top used
     }, indent=2)
 
 
@@ -865,7 +1036,8 @@ async def proxy_activate_from_spec(
     name: str,
     spec_url: str,
     spec_type: str = "openapi",
-    eager: bool = True
+    eager: bool = True,
+    lean: bool = False
 ) -> str:
     """
     Generate an MCP server from an OpenAPI/GraphQL spec and activate it.
@@ -875,6 +1047,9 @@ async def proxy_activate_from_spec(
         spec_url: URL to the OpenAPI spec (JSON/YAML) or GraphQL endpoint
         spec_type: 'openapi' or 'graphql'
         eager: If True, mount the server immediately
+        lean: If True, attempt to use LAP (https://lap.sh) to produce a dramatically
+              leaner input spec before 40mcp generation (F-12 research slice).
+              Falls back gracefully if LAP CLI not available.
     """
     if _config.guardrails_enabled and not check_rate_limit("anonymous"):
         return json.dumps({"ok": False, "error": "Rate limit exceeded."})
@@ -884,8 +1059,38 @@ async def proxy_activate_from_spec(
     configs_dir.mkdir(exist_ok=True)
     config_path = configs_dir / f"{name}.json"
 
-    # Use npx to run 40mcp generate
-    cmd = f"npx -y 40mcp generate {spec_url} --name {name}"
+    spec_for_generate = spec_url
+
+    if lean:
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                lap_file = os.path.join(tmp, f"{name}.lap")
+                lean_openapi = os.path.join(tmp, f"{name}_lean.json")
+                # Compile to LAP lean format
+                lap_compile = f"npx -y @lap-platform/lapsh compile {spec_url} --lean --output {lap_file}"
+                proc1 = await asyncio.create_subprocess_shell(
+                    lap_compile,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                await proc1.communicate()
+                if proc1.returncode == 0:
+                    # Convert back to lean OpenAPI
+                    lap_convert = f"npx -y @lap-platform/lapsh convert {lap_file} -f openapi --output {lean_openapi}"
+                    proc2 = await asyncio.create_subprocess_shell(
+                        lap_convert,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE
+                    )
+                    await proc2.communicate()
+                    if proc2.returncode == 0 and os.path.exists(lean_openapi):
+                        spec_for_generate = lean_openapi
+                        sys.stderr.write(f"[proxy] Used LAP for lean spec generation for {name}\n")
+        except Exception as lap_err:
+            sys.stderr.write(f"[proxy] LAP lean generation not available or failed, falling back: {lap_err}\n")
+
+    # Use npx to run 40mcp generate (on original or lean spec)
+    cmd = f"npx -y 40mcp generate {spec_for_generate} --name {name}"
     if spec_type == "graphql":
         cmd += " --graphql"
     
@@ -905,9 +1110,10 @@ async def proxy_activate_from_spec(
             f.write(stdout.decode())
 
         # Register it in the catalogue for this session
+        desc = f"Generated from {spec_url}" + (" (LAP lean)" if spec_for_generate != spec_url else "")
         entry = CatalogueEntry(
             name=name,
-            description=f"Generated from {spec_url}",
+            description=desc,
             runtime="rest",
             config_path=f"configs/{name}.json"
         )
@@ -1019,7 +1225,8 @@ def proxy_add_custom_proxy(
         })
 
     entry = ProxyEntry(
-        name=name, url=url, tags=tags or [], runtime=runtime, active=activate_now
+        name=name, url=url, tags=tags or [], runtime=runtime, active=activate_now,
+        compression_profile=None, auto_compress=False
     )
     save_proxy(entry, _config)
 
@@ -1039,12 +1246,34 @@ def proxy_get_metrics() -> str:
     return resource_health()
 
 
+@mcp.tool(name="proxy_get_usage")
+def proxy_get_usage() -> str:
+    """Return current server usage counts for self-evolving ranking (F-13)."""
+    sorted_usage = dict(sorted(_server_usage.items(), key=lambda x: -x[1]))
+    return json.dumps({
+        "ok": True,
+        "usage": sorted_usage,
+        "note": "Higher usage boosts ranking in future handshakes."
+    }, indent=2)
+
+
+@mcp.tool(name="proxy_reset_usage")
+def proxy_reset_usage(server: str | None = None) -> str:
+    """Reset usage stats (all or for one server). Useful for testing or re-baselining."""
+    if server:
+        _server_usage.pop(server, None)
+    else:
+        _server_usage.clear()
+    _persist_usage()
+    return json.dumps({"ok": True, "message": f"Reset usage for {server or 'all'}; persisted."})
+
+
 # ---------------------------------------------------------------------------
 # Startup: mount persisted proxies + scan plugins
 # ---------------------------------------------------------------------------
 
 def _on_plugin_register(name: str, command: str) -> None:
-    entry = ProxyEntry(name=name, url=f"stdio://{command}", tags=[], runtime="stdio")
+    entry = ProxyEntry(name=name, url=f"stdio://{command}", tags=[], runtime="stdio", compression_profile=None, auto_compress=False)
     ok, msg = _do_mount(entry)
     sys.stderr.write(f"[plugin_scanner] {msg}\n")
 
@@ -1059,6 +1288,9 @@ def _startup() -> None:
 
     _config = load_config()
     _catalogue = load_catalogue(_config)
+
+    if _config.usage_stats:
+        _server_usage.update(_config.usage_stats)
 
     init_audit_log(_config)
     init_rate_limiter(_config)
