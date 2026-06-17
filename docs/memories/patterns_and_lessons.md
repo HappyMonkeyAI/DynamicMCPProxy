@@ -130,6 +130,7 @@
 - Smart truncate (head + tail) when budget active
 - Integrated into `_apply_steering` without breaking existing pick/omit/template/token_budget
 - Seeded example on github entry
+- Enhanced with 'api' profile for nested list/string truncation in JSON responses (F-11)
 **Cherry-picks:** 9router RTK techniques for tool_result compression + LAP lean-mode philosophy.
 **Verification:** Extended tests pass; preserves behavior for old fields.
 **Status:** Implemented as first slice of research round 2. Preserves stdout discipline.
