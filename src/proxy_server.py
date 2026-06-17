@@ -1171,10 +1171,12 @@ def proxy_reset_usage(server: str | None = None) -> str:
     """Reset usage stats (all or for one server). Useful for testing or re-baselining."""
     if server:
         _server_usage.pop(server, None)
-        return json.dumps({"ok": True, "message": f"Reset usage for {server}"})
     else:
         _server_usage.clear()
-        return json.dumps({"ok": True, "message": "All usage stats reset."})
+    # Persist
+    _config.usage_stats = dict(_server_usage)
+    save_config(_config)
+    return json.dumps({"ok": True, "message": f"Reset usage for {server or 'all'}; persisted."})
 
 
 # ---------------------------------------------------------------------------
