@@ -134,3 +134,14 @@
 **Verification:** Extended tests pass; preserves behavior for old fields.
 **Status:** Implemented as first slice of research round 2. Preserves stdout discipline.
 
+### [S-20] LAP lean spec support in proxy_activate_from_spec (F-12)
+**Pattern:** Generating REST bridges via 40mcp from full OpenAPI/GraphQL specs produces verbose configs that bloat context, similar to problems solved by LAP.
+**Solution:** Extended `proxy_activate_from_spec` with `lean: bool = False`. When enabled:
+- Attempts to use `npx @lap-platform/lapsh compile --lean` then `convert` to produce leaner OpenAPI input.
+- Falls back silently to original spec if LAP CLI unavailable or fails (no new deps, graceful).
+- Updates generated entry description to note "(LAP lean)".
+- Results in smaller `configs/*.json` and thus leaner tool schemas exposed via RESTLoader.
+**Cherry-picks:** LAP's semantic compression (5-40x on verbose specs), typed lean contracts, and explicit complementarity to MCP ("LAP compresses the documentation").
+**Verification:** Code paths exercised; existing activate flow unchanged.
+**Status:** Implemented. Enables dramatically leaner input specs for F-12 research goal. Update catalogue entries or use lean=True for heavy APIs.
+

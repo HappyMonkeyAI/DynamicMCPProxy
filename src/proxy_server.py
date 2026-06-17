@@ -27,6 +27,7 @@ import os
 import platform
 import shlex
 import sys
+import tempfile
 import threading
 import time
 from collections import OrderedDict
@@ -936,7 +937,8 @@ async def proxy_activate_from_spec(
     name: str,
     spec_url: str,
     spec_type: str = "openapi",
-    eager: bool = True
+    eager: bool = True,
+    lean: bool = False
 ) -> str:
     """
     Generate an MCP server from an OpenAPI/GraphQL spec and activate it.
@@ -946,6 +948,9 @@ async def proxy_activate_from_spec(
         spec_url: URL to the OpenAPI spec (JSON/YAML) or GraphQL endpoint
         spec_type: 'openapi' or 'graphql'
         eager: If True, mount the server immediately
+        lean: If True, attempt to use LAP (https://lap.sh) to produce a dramatically
+              leaner input spec before 40mcp generation (F-12 research slice).
+              Falls back gracefully if LAP CLI not available.
     """
     if _config.guardrails_enabled and not check_rate_limit("anonymous"):
         return json.dumps({"ok": False, "error": "Rate limit exceeded."})
@@ -955,8 +960,38 @@ async def proxy_activate_from_spec(
     configs_dir.mkdir(exist_ok=True)
     config_path = configs_dir / f"{name}.json"
 
-    # Use npx to run 40mcp generate
-    cmd = f"npx -y 40mcp generate {spec_url} --name {name}"
+    spec_for_generate = spec_url
+
+    if lean:
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                lap_file = os.path.join(tmp, f"{name}.lap")
+                lean_openapi = os.path.join(tmp, f"{name}_lean.json")
+                # Compile to LAP lean format
+                lap_compile = f"npx -y @lap-platform/lapsh compile {spec_url} --lean --output {lap_file}"
+                proc1 = await asyncio.create_subprocess_shell(
+                    lap_compile,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                await proc1.communicate()
+                if proc1.returncode == 0:
+                    # Convert back to lean OpenAPI
+                    lap_convert = f"npx -y @lap-platform/lapsh convert {lap_file} -f openapi --output {lean_openapi}"
+                    proc2 = await asyncio.create_subprocess_shell(
+                        lap_convert,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE
+                    )
+                    await proc2.communicate()
+                    if proc2.returncode == 0 and os.path.exists(lean_openapi):
+                        spec_for_generate = lean_openapi
+                        sys.stderr.write(f"[proxy] Used LAP for lean spec generation for {name}\n")
+        except Exception as lap_err:
+            sys.stderr.write(f"[proxy] LAP lean generation not available or failed, falling back: {lap_err}\n")
+
+    # Use npx to run 40mcp generate (on original or lean spec)
+    cmd = f"npx -y 40mcp generate {spec_for_generate} --name {name}"
     if spec_type == "graphql":
         cmd += " --graphql"
     
@@ -976,9 +1011,10 @@ async def proxy_activate_from_spec(
             f.write(stdout.decode())
 
         # Register it in the catalogue for this session
+        desc = f"Generated from {spec_url}" + (" (LAP lean)" if spec_for_generate != spec_url else "")
         entry = CatalogueEntry(
             name=name,
-            description=f"Generated from {spec_url}",
+            description=desc,
             runtime="rest",
             config_path=f"configs/{name}.json"
         )
