@@ -72,6 +72,9 @@ class AppConfig(BaseModel):
     # Registered proxies (persisted)
     proxies: list[ProxyEntry] = Field(default_factory=list)
 
+    # Usage stats for self-evolving (F-13, persisted optionally)
+    usage_stats: dict[str, int] = Field(default_factory=dict)
+
 
 class CatalogueEntry(BaseModel):
     """A single entry in the bundled MCP server catalogue."""

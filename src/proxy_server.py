@@ -1198,6 +1198,9 @@ def _startup() -> None:
     _config = load_config()
     _catalogue = load_catalogue(_config)
 
+    if _config.usage_stats:
+        _server_usage.update(_config.usage_stats)
+
     init_audit_log(_config)
     init_rate_limiter(_config)
 
