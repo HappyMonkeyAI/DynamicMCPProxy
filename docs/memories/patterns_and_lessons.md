@@ -164,3 +164,5 @@
 **Verification:** New tools follow naming convention; no stdout issues.
 **Status:** Complements the usage tracking.
 
+F-13 (usage + knowledge + persist + inspect/reset) is now substantially complete. Self-evolving ranking is live (in-memory + persisted on key events). Ready for structural enhancements from memtrace research.
+
