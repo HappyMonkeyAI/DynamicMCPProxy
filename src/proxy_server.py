@@ -87,6 +87,11 @@ _pending_servers: dict[str, Any] = {}
 # server name -> number of successful activations / tool calls
 _server_usage: dict[str, int] = defaultdict(int)
 
+# Simple cache for tool lists to reduce repeated discovery / cold start costs (F-15 research)
+# key: provider prefix or name -> (list_of_tools, timestamp)
+_tool_list_cache: dict[str, tuple[list, float]] = {}
+_TOOL_CACHE_TTL = 300.0  # 5 min
+
 def _persist_usage() -> None:
     """Persist current usage stats to config (for self-evolving across restarts)."""
     global _config
@@ -347,9 +352,19 @@ async def _list_provider_tools(provider: Any, timeout_s: float = 3.0) -> list[An
     """
     List tools from one mounted provider with a timeout.
     A single slow provider must not block discovery of the rest of the registry.
+    Caches results briefly to mitigate repeated discovery costs (research on cold starts).
     """
+    prefix = _provider_prefix(provider) or getattr(provider, "name", "unknown")
+    now = time.monotonic()
+    if prefix in _tool_list_cache:
+        tools, ts = _tool_list_cache[prefix]
+        if now - ts < _TOOL_CACHE_TTL:
+            return tools
+
     try:
-        return await asyncio.wait_for(provider.list_tools(), timeout=timeout_s)
+        tools = await asyncio.wait_for(provider.list_tools(), timeout=timeout_s)
+        _tool_list_cache[prefix] = (tools, now)
+        return tools
     except Exception as e:
         sys.stderr.write(f"[proxy] Error listing tools for provider {getattr(provider, 'name', 'unknown')}: {e}\n")
         return []
@@ -465,6 +480,7 @@ def _do_mount(entry: ProxyEntry) -> tuple[bool, str]:
             _active_servers.move_to_end(entry.name)
             _server_usage[entry.name] += 1
             _persist_usage()
+            _tool_list_cache.pop(entry.name, None)  # invalidate cache on (re)mount
 
         return True, f"Mounted '{entry.name}' ({estimated} tools estimated)."
     except Exception as exc:
@@ -572,6 +588,7 @@ def _do_unmount(name: str) -> tuple[bool, str]:
                 return True, f"Cleared pending entry '{name}'."
 
         _active_servers.pop(name, None)
+        _tool_list_cache.pop(name, None)  # clear cache
         
     # fastmcp doesn't have a public unmount API yet
     # We remove it from providers map directly

@@ -179,3 +179,9 @@ F-13 (usage + knowledge + persist + inspect/reset) is now substantially complete
 **Verification:** New tests pass.
 **Status:** First slice of F-15. Enables "search then activate" workflow on top of existing lazy stubs and usage self-evolution.
 
+### [S-26] Tool list caching to reduce discovery overhead (F-15)
+**Pattern:** Repeated list_tools() and capability discovery cause cold starts and latency (common in MCP research).
+**Solution:** Added simple TTL cache in _list_provider_tools (5min). Invalidate on mount/unmount. Complements search for efficient on-demand.
+**Verification:** Code paths covered indirectly.
+**Status:** Part of caching slice.
+
