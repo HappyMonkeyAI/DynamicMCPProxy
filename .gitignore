@@ -18,6 +18,7 @@ secrets.json
 # Runtime / Audit
 audit.log
 *.log
+audits/
 
 # Python
 __pycache__/

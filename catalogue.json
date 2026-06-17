@@ -1010,5 +1010,33 @@
     "runtime": "stdio",
     "env_vars": [],
     "estimated_tools": 25
+  },
+  {
+    "name": "repo-audit-scan",
+    "description": "Security-focused repository audit scanner \u2014 scan local repos for code vulnerabilities, misconfigurations, and secrets. 124 rules across 25 categories, IAN risk scoring, ticket-ready triage, and adversarial review.",
+    "command": "/home/stephen/dynamic-mcp-proxy-server/plugins/repo-audit-scan.sh",
+    "tags": [
+      "audit",
+      "security",
+      "code_review",
+      "vulnerabilities",
+      "secrets",
+      "misconfiguration",
+      "scan",
+      "python"
+    ],
+    "tech_stack": [
+      "python",
+      "javascript",
+      "typescript",
+      "php",
+      "wordpress",
+      "java",
+      "csharp",
+      "dotnet"
+    ],
+    "runtime": "stdio",
+    "env_vars": [],
+    "estimated_tools": 10
   }
 ]

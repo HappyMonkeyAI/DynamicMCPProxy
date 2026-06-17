@@ -191,3 +191,9 @@ F-13 (usage + knowledge + persist + inspect/reset) is now substantially complete
 **Verification:** Directly addresses the critical finding in the code review on PR #7. Existing tests continue to pass; failure path now observable in stderr (consistent with stdout discipline).
 **Status:** Resolved. Follows previous pattern of addressing Amazon Q comments (see S-?? for PR #6).
 
+### [S-28] Wrapping custom MCP servers as FastMCP plugin bridges
+**Pattern:** External tools (e.g. repo-audit-scan) have their own MCPServer class but don't use FastMCP stdio transport. They can't be mounted as proxy tools without a transport bridge.
+**Fix:** Create a `mcp_fastmcp_server.py` that imports the external project's MCPServer singleton, wraps each tool method in `@mcp.tool()` decorators, and exposes them over stdio. Create a `plugins/{name}.sh` shell script pointing the venv's python at the bridge. The plugin scanner auto-detects and mounts it.
+**Verification:** Plugin scanner log shows `Mounted 'repo-audit-scan' (10 tools estimated)`. Tools respond correctly over stdio.
+**Status:** Resolved. Example at `projects/AuditScan/mcp_fastmcp_server.py`, `plugins/repo-audit-scan.sh`, `catalogue.json` entry.
+

@@ -9,6 +9,13 @@ Private, gitignored. Contains servers from the user's existing IDE setup (antigr
 ## .env
 Private, gitignored. Loaded via `python-dotenv` at import time in `config.py` with `override=False` (real env vars always win). Contains API keys for both catalogue servers (blanked template) and user servers (pre-filled from antigravity config).
 
+## Plugin Scanner (hot-plug)
+The `plugin_scanner.py` watches `plugins/` for `*.sh` executables and mounts them automatically as stdio MCP servers. Each `.sh` file points to a FastMCP bridge script. Example:
+- `plugins/rep-security-scan.sh` → `projects/repo-security-scan/mcp_server.py` (native FastMCP)
+- `plugins/repo-audit-scan.sh` → `projects/AuditScan/mcp_fastmcp_server.py` (custom MCPServer wrapped in FastMCP)
+
+Plugin name is derived from the filename (minus `.sh`). No catalogue entry is needed for plugin scanner mounts, but adding one makes the server discoverable via `proxy_search_tools`.
+
 ## Merge Logic (load_catalogue)
 1. Load `catalogue.json` (public)
 2. Load `user.catalogue.json` (private, optional)
