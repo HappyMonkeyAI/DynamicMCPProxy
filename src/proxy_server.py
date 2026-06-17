@@ -30,7 +30,7 @@ import sys
 import tempfile
 import threading
 import time
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -82,6 +82,10 @@ _lock = threading.Lock()
 # Pending (deferred) servers: registered but not yet materialised.
 # key = server name, value = CatalogueEntry or ProxyEntry
 _pending_servers: dict[str, Any] = {}
+
+# In-memory usage stats for self-evolving matcher (F-13)
+# server name -> number of successful activations / tool calls
+_server_usage: dict[str, int] = defaultdict(int)
 
 mcp = FastMCP(
     name="Dynamic MCP Proxy",
@@ -417,6 +421,8 @@ def _do_mount(entry: ProxyEntry) -> tuple[bool, str]:
                 raise
             finally:
                 latency = (time.monotonic() - start_time) * 1000
+                if outcome == "ok":
+                    _server_usage[entry.name] += 1
                 audit(
                     tool=f"{entry.name}_{name}" if not name.startswith(f"{entry.name}_") else name,
                     outcome=outcome,
@@ -431,6 +437,7 @@ def _do_mount(entry: ProxyEntry) -> tuple[bool, str]:
         with _lock:
             _active_servers[entry.name] = (entry, proxy, estimated)
             _active_servers.move_to_end(entry.name)
+            _server_usage[entry.name] += 1
 
         return True, f"Mounted '{entry.name}' ({estimated} tools estimated)."
     except Exception as exc:
@@ -759,7 +766,7 @@ def proxy_handshake(
         requirements=requirements or [],
     )
 
-    ranked = rank_servers(context, _catalogue, top_k=5)
+    ranked = rank_servers(context, _catalogue, top_k=5, usage=dict(_server_usage))
     activated: list[str] = []
     skipped: list[str] = []
 

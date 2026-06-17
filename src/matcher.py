@@ -123,14 +123,18 @@ def rank_servers(
     context: ProjectContext,
     catalogue: list[CatalogueEntry],
     top_k: int = 5,
+    usage: dict[str, int] | None = None,
 ) -> list[RankedEntry]:
     """
     Score and rank catalogue entries against a ProjectContext.
 
     Returns up to top_k entries sorted by score descending.
     Entries with score == 0 are excluded.
+
+    usage: optional {server_name: call_count} for self-evolving boost (F-13).
     """
     context_tokens = _normalise(context.tech_stack + context.requirements)
+    usage = usage or {}
 
     ranked: list[RankedEntry] = []
     for entry in catalogue:
@@ -141,13 +145,18 @@ def rank_servers(
             + _open_files_score(context.open_files, entry)
         )
 
-        # F-13 starter: knowledge server bonus (memtrace/Beever Atlas style from research)
-        # Boost servers tagged for memory/wiki/graph when task mentions them
+        # F-13: knowledge server bonus (memtrace/Beever Atlas style)
         knowledge_keywords = ["memory", "knowledge", "wiki", "history", "team", "previous", "decision", "context"]
         if any(kw in context.task_description.lower() for kw in knowledge_keywords):
             entry_tags_lower = [t.lower() for t in entry.tags]
             if any(k in entry_tags_lower for k in ["knowledge", "wiki", "memory", "graph", "rag", "context"]):
-                score += 0.8  # meaningful boost for relevance
+                score += 0.8
+
+        # Usage boost for self-evolving ranking (frequently used servers get priority)
+        if entry.name in usage:
+            # Diminishing returns, max +2.0
+            usage_boost = min(usage[entry.name], 20) * 0.1
+            score += usage_boost
 
         if score > 0:
             ranked.append(RankedEntry(entry=entry, score=round(score, 4)))

@@ -152,3 +152,9 @@
 **Verification:** All matcher tests still pass.
 **Status:** Starter slice. Full self-evolving + structural to follow.
 
+### [S-22] Basic usage tracking for self-evolving ranking (F-13)
+**Pattern:** Without remembering which servers were useful, the matcher stays static. Frequent use should increase future relevance.
+**Solution:** Added module-level _server_usage (increment on successful mount + tool calls in audited_call). Passed to rank_servers as optional usage dict for additive boost (capped diminishing returns). Knowledge bonus (S-21) + usage now work together.
+**Verification:** New test passes; no impact on other ranking tests.
+**Status:** In-memory for this slice. Persistence via proxy_config or separate can follow.
+

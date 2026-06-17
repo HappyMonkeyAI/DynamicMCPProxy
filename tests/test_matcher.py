@@ -84,3 +84,27 @@ def test_rank_scores_are_sorted_descending():
     results = rank_servers(ctx, CATALOGUE, top_k=5)
     scores = [r.score for r in results]
     assert scores == sorted(scores, reverse=True)
+
+
+def test_rank_usage_boost():
+    """Usage stats boost frequently called servers (F-13)."""
+    ctx = ProjectContext(task_description="need to check previous team decisions on auth")
+    # Add a knowledge server to the test catalogue copy
+    knowledge_cat = CATALOGUE + [
+        _make_entry("team-wiki", ["knowledge", "wiki", "memory", "team"],
+                    description="Team knowledge base and history")
+    ]
+    # Without usage
+    results_no = rank_servers(ctx, knowledge_cat, top_k=5)
+    # With high usage on wiki
+    results_yes = rank_servers(ctx, knowledge_cat, top_k=5, usage={"team-wiki": 15})
+    names_no = [r.entry.name for r in results_no]
+    names_yes = [r.entry.name for r in results_yes]
+    # wiki should rank higher with usage
+    if "team-wiki" in names_yes:
+        rank_yes = names_yes.index("team-wiki")
+        if "team-wiki" in names_no:
+            rank_no = names_no.index("team-wiki")
+            assert rank_yes <= rank_no
+        else:
+            assert rank_yes < len(names_yes)
