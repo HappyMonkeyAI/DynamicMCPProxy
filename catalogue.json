@@ -992,5 +992,23 @@
     "runtime": "stdio",
     "env_vars": [],
     "estimated_tools": 28
+  },
+  {
+    "name": "memtrace",
+    "description": "Structural + bi-temporal code knowledge graph for AI coding agents (Rust+Tree-sitter, 25+ MCP tools). Fast local indexing, no LLM calls for graph. (Private beta; see research notes. Placeholder until public.)",
+    "tags": [
+      "code",
+      "knowledge_graph",
+      "memory",
+      "refactor",
+      "impact",
+      "research"
+    ],
+    "tech_stack": [
+      "any"
+    ],
+    "runtime": "stdio",
+    "env_vars": [],
+    "estimated_tools": 25
   }
 ]
