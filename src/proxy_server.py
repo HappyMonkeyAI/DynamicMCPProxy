@@ -899,13 +899,17 @@ def proxy_list_available_servers(filter_tag: str = "") -> str:
     List MCP servers in the catalogue that are not yet mounted.
 
     Args:
-        filter_tag: Optional tag to filter by (e.g. "database", "search")
+        filter_tag: Optional tag filter, or free-text query (uses search_servers for discovery).
     """
-    available = [
-        cat for cat in _catalogue
-        if cat.name not in _active_servers
-        and (not filter_tag or filter_tag.lower() in [t.lower() for t in cat.tags])
-    ]
+    if filter_tag:
+        # Use search for richer query support (F-15)
+        results = search_servers(filter_tag, _catalogue, limit=20, usage=dict(_server_usage))
+        available = [r.entry for r in results if r.entry.name not in _active_servers]
+    else:
+        available = [
+            cat for cat in _catalogue
+            if cat.name not in _active_servers
+        ]
     return json.dumps({
         "available_servers": [
             {
