@@ -173,3 +173,9 @@ F-13 (usage + knowledge + persist + inspect/reset) is now substantially complete
 **Verification:** Loads cleanly.
 **Status:** Part of F-14 catalogue expansion.
 
+### [S-25] On-demand tool search for lazy discovery (F-15)
+**Pattern:** Loading full tool catalogues or even ranked lists upfront wastes context; AI should discover relevant servers on-demand via search query.
+**Solution:** Added search_servers() in matcher (hybrid desc/tag/name + reuse of usage/knowledge boosts) and proxy_search_tools(query, limit) tool. Returns scored matches without activation. Aligns with Anthropic Tool Search, Stacklok Optimizer, lazy/passive server patterns seen in research.
+**Verification:** New tests pass.
+**Status:** First slice of F-15. Enables "search then activate" workflow on top of existing lazy stubs and usage self-evolution.
+

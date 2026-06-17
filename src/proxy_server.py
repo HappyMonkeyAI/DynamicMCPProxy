@@ -62,7 +62,7 @@ from .guardrails import (
     scan_tool_description,
     truncate_result,
 )
-from .matcher import ProjectContext, rank_servers
+from .matcher import ProjectContext, rank_servers, search_servers
 from .plugin_scanner import PluginScanner
 from .loaders.rest import RESTLoader
 
@@ -902,6 +902,48 @@ def proxy_list_available_servers(filter_tag: str = "") -> str:
             for c in available
         ],
         "count": len(available),
+    }, indent=2)
+
+
+@mcp.tool(name="proxy_search_tools")
+def proxy_search_tools(query: str, limit: int = 10) -> str:
+    """
+    Search the catalogue for relevant servers/tools using free-text query.
+    Enables on-demand discovery (lazy loading pattern) so the AI can find
+    specific capabilities without the full catalogue bloating context.
+
+    Returns ranked list of matching servers (name, desc, score, tags).
+    Use proxy_activate_server on results, or let handshake do it.
+
+    Inspired by MCP tool search / lazy discovery best practices (Anthropic, Stacklok, etc.).
+    """
+    if not query or not query.strip():
+        return json.dumps({"ok": False, "error": "Query required."})
+
+    results = search_servers(
+        query.strip(),
+        _catalogue,
+        limit=limit,
+        usage=dict(_server_usage),
+    )
+
+    return json.dumps({
+        "ok": True,
+        "query": query,
+        "results": [
+            {
+                "name": r.entry.name,
+                "description": r.entry.description,
+                "tags": r.entry.tags,
+                "tech_stack": r.entry.tech_stack,
+                "runtime": r.entry.runtime,
+                "score": r.score,
+                "estimated_tools": getattr(r.entry, "estimated_tools", 10),
+            }
+            for r in results
+        ],
+        "count": len(results),
+        "note": "Activate with proxy_activate_server(name) or rely on proxy_handshake for auto.",
     }, indent=2)
 
 

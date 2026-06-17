@@ -163,3 +163,52 @@ def rank_servers(
 
     ranked.sort(key=lambda r: r.score, reverse=True)
     return ranked[:top_k]
+
+
+def search_servers(
+    query: str,
+    catalogue: list[CatalogueEntry],
+    limit: int = 10,
+    usage: dict[str, int] | None = None,
+) -> list[RankedEntry]:
+    """
+    Search catalogue for servers matching a free-text query.
+    Designed for on-demand discovery (F-15) so AI can find relevant tools
+    without loading full catalogs into context.
+
+    Scores based on description, tags, name, tech_stack overlap with query.
+    Boosts with usage and knowledge tags (from F-13).
+    """
+    if not query:
+        return []
+
+    query_tokens = _normalise(query.split())
+    usage = usage or {}
+
+    ranked: list[RankedEntry] = []
+    for entry in catalogue:
+        # Base: description + tags + name + tech match
+        desc_score = _description_score(query, entry) * 2.0  # weight query heavily
+        tag_score = _tag_overlap_score(query_tokens, entry)
+        name_tokens = _normalise([entry.name])
+        name_score = len(query_tokens & name_tokens) * 1.5
+
+        score = desc_score + tag_score + name_score + _requirements_score([], entry)  # reuse some
+
+        # Reuse F-13 knowledge bonus if query looks knowledge-oriented
+        knowledge_keywords = ["memory", "knowledge", "wiki", "history", "team", "previous", "decision", "context"]
+        if any(kw in query.lower() for kw in knowledge_keywords):
+            entry_tags_lower = [t.lower() for t in entry.tags]
+            if any(k in entry_tags_lower for k in ["knowledge", "wiki", "memory", "graph", "rag", "context"]):
+                score += 0.8
+
+        # Usage boost
+        if entry.name in usage:
+            usage_boost = min(usage[entry.name], 20) * 0.1
+            score += usage_boost
+
+        if score > 0:
+            ranked.append(RankedEntry(entry=entry, score=round(score, 4)))
+
+    ranked.sort(key=lambda r: r.score, reverse=True)
+    return ranked[:limit]

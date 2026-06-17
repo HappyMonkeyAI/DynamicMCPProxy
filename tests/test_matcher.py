@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 from src.config import CatalogueEntry
-from src.matcher import ProjectContext, rank_servers
+from src.matcher import ProjectContext, rank_servers, search_servers
 
 
 def _make_entry(name: str, tags: list[str], tech_stack: list[str] = None,
@@ -108,3 +108,19 @@ def test_rank_usage_boost():
             assert rank_yes <= rank_no
         else:
             assert rank_yes < len(names_yes)
+
+
+def test_search_servers():
+    """Free-text search for on-demand discovery (F-15)."""
+    # Search by description keywords
+    results = search_servers("search the web for research", CATALOGUE, limit=3)
+    names = [r.entry.name for r in results]
+    assert "brave-search" in names
+
+    # Search by name/tag
+    results2 = search_servers("github code", CATALOGUE, limit=2)
+    names2 = [r.entry.name for r in results2]
+    assert "github" in names2
+
+    # Empty query
+    assert search_servers("", CATALOGUE) == []
