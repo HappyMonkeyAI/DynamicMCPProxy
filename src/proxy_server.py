@@ -87,6 +87,12 @@ _pending_servers: dict[str, Any] = {}
 # server name -> number of successful activations / tool calls
 _server_usage: dict[str, int] = defaultdict(int)
 
+def _persist_usage() -> None:
+    """Persist current usage stats to config (for self-evolving across restarts)."""
+    global _config
+    _config.usage_stats = dict(_server_usage)
+    save_config(_config)
+
 mcp = FastMCP(
     name="Dynamic MCP Proxy",
     instructions=(
@@ -423,6 +429,8 @@ def _do_mount(entry: ProxyEntry) -> tuple[bool, str]:
                 latency = (time.monotonic() - start_time) * 1000
                 if outcome == "ok":
                     _server_usage[entry.name] += 1
+                    if _server_usage[entry.name] % 5 == 0:
+                        _persist_usage()
                 audit(
                     tool=f"{entry.name}_{name}" if not name.startswith(f"{entry.name}_") else name,
                     outcome=outcome,
@@ -438,6 +446,7 @@ def _do_mount(entry: ProxyEntry) -> tuple[bool, str]:
             _active_servers[entry.name] = (entry, proxy, estimated)
             _active_servers.move_to_end(entry.name)
             _server_usage[entry.name] += 1
+            _persist_usage()
 
         return True, f"Mounted '{entry.name}' ({estimated} tools estimated)."
     except Exception as exc:
@@ -1173,9 +1182,7 @@ def proxy_reset_usage(server: str | None = None) -> str:
         _server_usage.pop(server, None)
     else:
         _server_usage.clear()
-    # Persist
-    _config.usage_stats = dict(_server_usage)
-    save_config(_config)
+    _persist_usage()
     return json.dumps({"ok": True, "message": f"Reset usage for {server or 'all'}; persisted."})
 
 
