@@ -574,9 +574,37 @@ Current matcher is pure keyword/Jaccard + file ext + requirements (good but shal
 - `CONTEXT.md` and `README.md` (reference the patterns book and research/ folder).
 - Optionally `research/LINKS.md` (already updated).
 
-**Status:** Partial (CONTEXT.md cross-refs added; Beever Atlas in catalogue).
+**Status:** Partial (CONTEXT.md cross-refs added; Beever Atlas + memtrace placeholder in catalogue; docs updated).
 
 **Priority:** Low-code, high-documentation value.
+
+---
+
+### F-15: On-Demand Tool Search / Discovery (new from 2026 research)
+
+**What it does:**
+Add `proxy_search_tools(query)` (and supporting `search_servers`) so AI can discover relevant servers on-demand via free-text search instead of pre-loading full lists or even top-N.
+- Hybrid scoring (desc + tags + name + reuse usage/knowledge).
+- Returns metadata only; activation separate or via handshake.
+- Complements existing lazy stubs and budget.
+
+**Files to modify:**
+- `src/matcher.py` — search_servers
+- `src/proxy_server.py` — new tool, integrate
+- tests
+- docs
+
+**Cherry-picks:**
+- Anthropic Tool Search, Stacklok Optimizer, lazy/passive servers, GhidraMCP batch warm-up, search instead of dump (dev.to, HN discussions).
+- Reduces upfront context from tool defs.
+
+**Verification:**
+- Unit tests for search.
+- Manual: search "github" returns relevant.
+
+**Status:** Basic implemented (search tool + caching for lists). Schema caching added for discovery perf. Full integration with handshake (e.g. search mode) or semantic embeddings next.
+
+**Priority:** Tier 1 (addresses core context pollution research theme).
 
 ---
 
