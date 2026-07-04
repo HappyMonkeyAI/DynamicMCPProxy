@@ -179,7 +179,12 @@ Keys follow the `env_vars` field in each catalogue entry. Values in real environ
   "guardrails_enabled": true,
   "rate_limit_rpm": 120,
   "catalogue_path": "catalogue.json",
-  "audit_log_path": "audit.log"
+  "audit_log_path": "audit.log",
+  "receipts_enabled": true,
+  "otel_enabled": false,
+  "otel_service_name": "dynamic-mcp-proxy",
+  "otel_exporter_otlp_endpoint": null,
+  "otel_capture_content": false
 }
 ```
 
@@ -187,6 +192,38 @@ Key settings:
 - `tool_budget` — max tools exposed at once (default 50, matches Antigravity limit)
 - `auth_enabled` — JWT RS256 + HMAC API key auth for production use
 - `guardrails_enabled` — prompt-injection scanning + result size caps
+- `receipts_enabled` — write JSONL receipts to `audit_log_path` with `run_id`, `span_id`, caller, status, latency, server/tool names, and privacy-safe argument summaries
+- `otel_enabled` — optionally mirror receipt events into OpenTelemetry when `opentelemetry-*` packages are installed; JSONL receipts continue to work without those optional packages
+- `otel_capture_content` — defaults to `false`; do not capture raw prompts, customer content, API keys, or tool payloads in traces by default
+
+## Receipts and Traceability
+
+DynamicMCPProxy is the right place to collect agent receipts because every server activation and child MCP tool call passes through it. Receipts are enabled by default as local JSONL in `audit.log` and are designed for security-first debugging:
+
+- Every record includes a `run_id` and `span_id`; related operations can pass a parent span where available.
+- HMAC/JWT callers are identified by auth type, not by secret value. For example, sidecar HMAC calls record `service:hmac`.
+- Tool arguments are summarized as keys, types, lengths, and SHA-256 fingerprints. Raw strings, nested payloads, passwords, tokens, cookies, and API keys are not logged.
+- OpenTelemetry export is optional and dependency-optional. If enabled without the OTel packages installed, the proxy logs one warning to stderr and continues with JSONL receipts.
+
+Example JSONL record shape:
+
+```json
+{
+  "ts": "2026-07-04T12:00:00+00:00",
+  "event_type": "mcp.tool.call",
+  "run_id": "run_...",
+  "span_id": "...",
+  "tool": "github_search",
+  "caller": "service:hmac",
+  "outcome": "ok",
+  "latency_ms": 42.1,
+  "server": "github",
+  "argument_keys": ["query"],
+  "redacted_args": {
+    "query": {"type": "str", "length": 12, "sha256": "..."}
+  }
+}
+```
 
 ## Security
 
@@ -194,7 +231,7 @@ When `auth_enabled = true`:
 - JWT (RS256) — set `jwt_public_key_path` to your RSA public key PEM
 - HMAC API key — set `hmac_api_key` (passed via `X-API-Key` header)
 - Guardrails — 8 prompt-injection pattern checks on all tool descriptions
-- Audit log — every tool call logged to `audit.log` (JSON lines)
+- Audit log / receipts — every tool call logged to `audit.log` (JSON lines) with privacy-safe argument fingerprints, not raw secrets or payloads
 - Rate limiting — configurable RPM per caller
 
 ## Hot-Plug Plugins

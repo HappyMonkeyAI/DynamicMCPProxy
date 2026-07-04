@@ -19,6 +19,7 @@ from pydantic import BaseModel
 
 from .auth import authenticate, AuthError
 from .config import AppConfig, CatalogueEntry
+from .guardrails import new_run_id, receipt_context
 
 _api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
@@ -34,6 +35,7 @@ class HandshakeResponse(BaseModel):
     activated_servers: list[str]
     active_tool_count: int
     budget_remaining: int
+    run_id: str
     message: str
 
 
@@ -84,22 +86,26 @@ def create_app(
             bearer_token = auth_header.removeprefix("Bearer ").strip()
 
         try:
-            authenticate(bearer_token=bearer_token, api_key=api_key, config=config)
+            identity = authenticate(bearer_token=bearer_token, api_key=api_key, config=config)
         except AuthError as exc:
             raise HTTPException(status_code=401, detail=str(exc))
 
         try:
-            result_str = handshake_fn(
-                tech_stack=body.tech_stack,
-                task_description=body.task_description,
-                open_files=body.open_files,
-                requirements=body.requirements,
-            )
+            run_id = new_run_id()
+            caller = f"{identity.get('sub', 'anonymous')}:{identity.get('auth', 'unknown')}"
+            with receipt_context(caller=caller, run_id=run_id):
+                result_str = handshake_fn(
+                    tech_stack=body.tech_stack,
+                    task_description=body.task_description,
+                    open_files=body.open_files,
+                    requirements=body.requirements,
+                )
             result = _json.loads(result_str)
             return HandshakeResponse(
                 activated_servers=result.get("activated_servers", []),
                 active_tool_count=result.get("active_tool_count", 0),
                 budget_remaining=result.get("budget_remaining", config.tool_budget),
+                run_id=result.get("run_id", run_id),
                 message=(
                     f"Activated {len(result.get('activated_servers', []))} server(s). "
                     f"Connect via MCP and call tools/list to see available tools."

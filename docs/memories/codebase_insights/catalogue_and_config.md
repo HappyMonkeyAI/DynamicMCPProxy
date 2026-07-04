@@ -16,4 +16,10 @@ Private, gitignored. Loaded via `python-dotenv` at import time in `config.py` wi
 4. Result is the unified catalogue used by the matcher and proxy tools
 
 ## proxy_config.json
-Runtime config — tool budget, auth settings, guardrails, persisted custom proxies. Also gitignored (contains potential secrets). Auto-generated with safe defaults on first run.
+Runtime config — tool budget, auth settings, guardrails, receipts/OpenTelemetry settings, persisted custom proxies. Also gitignored (contains potential secrets). Auto-generated with safe defaults on first run.
+
+Receipt-related fields:
+- `receipts_enabled` defaults true and controls local JSONL audit/receipt writes.
+- `audit_log_path` is the local JSONL sink.
+- `otel_enabled` defaults false; optional packages are required for export, but absence must not break startup.
+- `otel_capture_content` defaults false and should stay false unless there is an explicit, reviewed need to capture payload content.

@@ -8,7 +8,7 @@ Concise operating manual. Source of truth for stack, rules, decisions, and contr
 - **Primary Transport**: stdio JSON-RPC (the proxy itself is an MCP server)
 - **Package/Run**: `uv sync` + `uv run --quiet python -m src.proxy_server`
 - **Catalogue Servers**: Mostly stdio (`npx -y ...` or `uvx`/`uv run`), some SSE/HTTP, plus `runtime: "rest"` for 40mcp declarative bridges
-- **Key Libraries**: fastmcp, pydantic (v2), httpx, watchdog, python-dotenv, PyJWT + cryptography, uvicorn (sidecar only)
+- **Key Libraries**: fastmcp, pydantic (v2), httpx, watchdog, python-dotenv, PyJWT + cryptography, uvicorn (sidecar only); OpenTelemetry packages are optional for trace export
 - **Config Layers**:
   - `catalogue.json` (public, committed)
   - `user.catalogue.json` (private overlay, gitignored)
@@ -49,6 +49,7 @@ See full records in `docs/memories/architectural_decisions/` and patterns.
 - **Deferred mounting** (S-10): Use stub `{name}_load` tools + `_pending_servers` so expensive servers are materialised only on first use.
 - **Tool budget + LRU**: `OrderedDict` + `estimated_tools` (with explicit overrides for heavy servers). Evict on `proxy_handshake` / activate when over budget.
 - **Response Steering**: `pick`/`omit`/`template`/`token_budget` per catalogue entry applied in `audited_call`.
+- **Receipts**: JSONL audit records include run/span ids and privacy-safe argument fingerprints; optional OpenTelemetry export mirrors spans without making OTel a required runtime dependency.
 - **Unmounted providers**: Filter `mcp.providers` by `_transforms` Namespace `_prefix`.
 - **REST bridges**: First-class via `runtime: "rest"` + 40mcp JSON configs (no Node dep for many APIs).
 - **Plugins**: Watchdog observer hot-plugs executables from `./plugins/`.

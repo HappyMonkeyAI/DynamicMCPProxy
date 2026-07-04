@@ -12,6 +12,7 @@ from src.guardrails import (
     check_rate_limit,
     init_audit_log,
     audit,
+    summarize_arguments,
 )
 
 
@@ -125,3 +126,46 @@ def test_audit_log_writes(tmp_path):
     assert line["tool"] == "proxy.handshake"
     assert line["outcome"] == "ok"
     assert line["latency_ms"] == 12.3
+
+
+def test_audit_log_includes_receipt_span_ids_and_parent(tmp_path):
+    import json
+    cfg = AppConfig(audit_log_path=str(tmp_path / "audit.log"))
+    init_audit_log(cfg)
+    audit(
+        tool="github_search",
+        caller="service:hmac",
+        outcome="ok",
+        latency_ms=4.2,
+        event_type="mcp.tool.call",
+        run_id="run_test",
+        parent_span_id="parent1234",
+        extra={"server": "github"},
+    )
+
+    line = json.loads((tmp_path / "audit.log").read_text().strip())
+    assert line["event_type"] == "mcp.tool.call"
+    assert line["run_id"] == "run_test"
+    assert line["span_id"]
+    assert line["parent_span_id"] == "parent1234"
+    assert line["caller"] == "service:hmac"
+    assert line["server"] == "github"
+
+
+def test_summarize_arguments_redacts_secret_values_and_keeps_fingerprints():
+    import json
+    summary = summarize_arguments({
+        "email": "customer@example.com",
+        "api_key": "secret-value",
+        "count": 3,
+        "nested": {"password": "p4ss", "safe": "value"},
+    })
+
+    rendered = json.dumps(summary)
+    assert "customer@example.com" not in rendered
+    assert "secret-value" not in rendered
+    assert "p4ss" not in rendered
+    assert summary["api_key"]["redacted"] is True
+    assert summary["email"]["type"] == "str"
+    assert summary["email"]["sha256"]
+    assert summary["count"] == 3

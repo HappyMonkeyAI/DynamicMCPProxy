@@ -15,6 +15,9 @@ def test_load_config_defaults(tmp_path: Path):
     assert cfg.tool_budget == 100
     assert cfg.auth_enabled is False
     assert cfg.guardrails_enabled is True
+    assert cfg.receipts_enabled is True
+    assert cfg.otel_enabled is False
+    assert cfg.otel_service_name == "dynamic-mcp-proxy"
     assert cfg.proxies == []
 
 

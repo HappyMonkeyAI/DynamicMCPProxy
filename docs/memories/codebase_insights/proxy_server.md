@@ -24,6 +24,9 @@ All `proxy_*` tools check `check_rate_limit()` at entry when `guardrails_enabled
 ### Auth Integration
 `authenticate()` is called in `api.py`'s `/handshake` endpoint (JWT Bearer or X-API-Key HMAC). When `auth_enabled=False` it returns a guest identity immediately — no-op for dev.
 
+### Receipt / Traceability Integration
+`guardrails.audit()` writes JSONL receipt records with `run_id`, `span_id`, `event_type`, caller, outcome, latency, and optional server/tool metadata. The HTTP sidecar binds HMAC/JWT identity (`service:hmac`, `<sub>:jwt`, etc.) with `receipt_context()` before calling `proxy_handshake()`, so caller/run identity is internal and not exposed as public MCP tool arguments. Child MCP tool calls are wrapped in `_do_mount()` with privacy-safe `summarize_arguments()` output: raw strings/nested payloads are not logged, only keys, types, lengths, and fingerprints. OpenTelemetry is optional via `src.telemetry`; it must remain dependency-optional and stderr-only on setup failure to preserve stdio safety.
+
 ### Custom Proxy Security
 `proxy_add_custom_proxy` rejects `runtime="stdio"` to prevent arbitrary command execution via AI-controlled tool calls. Only `sse` and `http` runtimes are accepted for custom proxies.
 

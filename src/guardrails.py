@@ -8,7 +8,11 @@ from __future__ import annotations
 
 import json
 import re
+import hashlib
+import uuid
 import time
+import contextvars
+from contextlib import contextmanager
 from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
@@ -130,10 +134,103 @@ def check_rate_limit(caller: str = "anonymous") -> bool:
 
 _audit_lock = Lock()
 _audit_path: Optional[Path] = None
+_receipt_caller: contextvars.ContextVar[str] = contextvars.ContextVar("receipt_caller", default="anonymous")
+_receipt_run_id: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar("receipt_run_id", default=None)
+_SENSITIVE_KEY_RE = re.compile(
+    r"(api[_-]?key|token|secret|password|passwd|authorization|auth|cookie|session|private[_-]?key)",
+    re.IGNORECASE,
+)
+
+
+def new_run_id() -> str:
+    """Generate an opaque run id for correlating one receipt tree."""
+    return f"run_{uuid.uuid4().hex}"
+
+
+def new_span_id() -> str:
+    """Generate a short opaque span id for a single receipt event."""
+    return uuid.uuid4().hex[:16]
+
+
+def current_caller() -> str:
+    """Return the receipt caller bound to the current request context."""
+    return _receipt_caller.get()
+
+
+def current_run_id() -> Optional[str]:
+    """Return the receipt run id bound to the current request context, if any."""
+    return _receipt_run_id.get()
+
+
+@contextmanager
+def receipt_context(caller: str, run_id: Optional[str] = None):
+    """Bind caller/run id for internal receipt creation without public tool args."""
+    caller_token = _receipt_caller.set(caller)
+    run_token = _receipt_run_id.set(run_id)
+    try:
+        yield
+    finally:
+        _receipt_caller.reset(caller_token)
+        _receipt_run_id.reset(run_token)
+
+
+def _hash_value(value: object) -> str:
+    """Stable short fingerprint for values without storing the raw payload."""
+    raw = json.dumps(value, sort_keys=True, default=str, ensure_ascii=False)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+
+def _summarize_value(key: str, value: object) -> object:
+    if value is None or isinstance(value, bool):
+        return value
+    if isinstance(value, int | float):
+        return value
+    if isinstance(value, str):
+        summary = {
+            "type": "str",
+            "length": len(value),
+            "sha256": _hash_value(value),
+        }
+        if _SENSITIVE_KEY_RE.search(key):
+            summary["redacted"] = True
+        return summary
+    if isinstance(value, list):
+        return {
+            "type": "list",
+            "length": len(value),
+            "sha256": _hash_value(value),
+        }
+    if isinstance(value, dict):
+        return {
+            "type": "dict",
+            "keys": sorted(str(k) for k in value.keys())[:50],
+            "sha256": _hash_value(value),
+        }
+    return {
+        "type": type(value).__name__,
+        "sha256": _hash_value(value),
+    }
+
+
+def summarize_arguments(arguments: Optional[dict]) -> dict:
+    """
+    Return privacy-safe argument summaries for receipts.
+
+    Raw strings and nested payloads are never logged; strings/lists/dicts get
+    type/size/fingerprint metadata so calls can be compared without leaking
+    customer data or credentials. Numbers/bools are kept because they are often
+    operationally useful and low-risk.
+    """
+    if not arguments:
+        return {}
+    return {str(k): _summarize_value(str(k), v) for k, v in arguments.items()}
 
 
 def init_audit_log(config: AppConfig) -> None:
     global _audit_path
+    if not config.receipts_enabled:
+        _audit_path = None
+        return
     p = Path(config.audit_log_path)
     if not p.is_absolute():
         p = Path(__file__).parent.parent / p
@@ -146,6 +243,10 @@ def audit(
     caller: str = "anonymous",
     outcome: str = "ok",
     latency_ms: float = 0.0,
+    event_type: str = "tool.call",
+    run_id: Optional[str] = None,
+    span_id: Optional[str] = None,
+    parent_span_id: Optional[str] = None,
     extra: Optional[dict] = None,
 ) -> None:
     """Append a single structured log line to the audit log."""
@@ -153,11 +254,16 @@ def audit(
         return
     record = {
         "ts": datetime.now(timezone.utc).isoformat(),
+        "event_type": event_type,
+        "run_id": run_id or new_run_id(),
+        "span_id": span_id or new_span_id(),
         "tool": tool,
         "caller": caller,
         "outcome": outcome,
         "latency_ms": round(latency_ms, 2),
     }
+    if parent_span_id:
+        record["parent_span_id"] = parent_span_id
     if extra:
         record.update(extra)
     with _audit_lock:

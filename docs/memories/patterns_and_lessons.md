@@ -191,3 +191,9 @@ F-13 (usage + knowledge + persist + inspect/reset) is now substantially complete
 **Verification:** Directly addresses the critical finding in the code review on PR #7. Existing tests continue to pass; failure path now observable in stderr (consistent with stdout discipline).
 **Status:** Resolved. Follows previous pattern of addressing Amazon Q comments (see S-?? for PR #6).
 
+### [S-28] Security-first receipts for agent traceability
+**Pattern:** The dynamic proxy is the best control point for MCP observability, but raw audit logs are not enough: operators need correlatable receipts without leaking API keys, customer content, prompts, or private tool payloads.
+**Solution:** Extend `audit()` records with `event_type`, `run_id`, `span_id`, optional `parent_span_id`, caller identity, outcome, and latency. Add `summarize_arguments()` so child tool calls log argument keys plus type/length/hash summaries, never raw strings or nested payloads. HTTP sidecar HMAC/JWT auth now binds caller identity (`service:hmac`, `<sub>:jwt`) and a run id through `receipt_context()` before calling `proxy_handshake()`, without exposing those fields as public MCP tool arguments or recording the secret. OpenTelemetry export is optional/dependency-optional via `src.telemetry`; missing OTel packages only warn to stderr and JSONL receipts continue.
+**Verification:** Added tests for receipt IDs, redaction/fingerprints, config defaults, and HMAC identity propagation.
+**Status:** Implemented. Preserve stdout discipline and privacy defaults when extending.
+

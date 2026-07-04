@@ -57,14 +57,20 @@ from .config import (
 from .guardrails import (
     audit,
     check_rate_limit,
+    current_caller,
+    current_run_id,
     init_audit_log,
     init_rate_limiter,
+    new_run_id,
+    new_span_id,
     scan_tool_description,
+    summarize_arguments,
     truncate_result,
 )
 from .matcher import ProjectContext, rank_servers, search_servers
 from .plugin_scanner import PluginScanner
 from .loaders.rest import RESTLoader
+from .telemetry import init_telemetry, span as telemetry_span
 
 # ---------------------------------------------------------------------------
 # Globals
@@ -449,12 +455,22 @@ def _do_mount(entry: ProxyEntry) -> tuple[bool, str]:
         original_call = proxy.call_tool
         
         async def audited_call(name: str, arguments: dict | None = None, **kwargs) -> Any:
+            run_id = new_run_id()
+            span_id = new_span_id()
             start_time = time.monotonic()
             outcome = "ok"
             try:
-                result = await original_call(name, arguments, **kwargs)
-                # Apply steering / response shaping
-                result = _apply_steering(result, entry)
+                with telemetry_span(
+                    "mcp.tool.call",
+                    {
+                        "mcp.server.name": entry.name,
+                        "mcp.tool.name": name,
+                        "mcp.runtime": entry.runtime,
+                    },
+                ):
+                    result = await original_call(name, arguments, **kwargs)
+                    # Apply steering / response shaping
+                    result = _apply_steering(result, entry)
                 return result
             except Exception as e:
                 outcome = f"error: {str(e)}"
@@ -469,7 +485,15 @@ def _do_mount(entry: ProxyEntry) -> tuple[bool, str]:
                     tool=f"{entry.name}_{name}" if not name.startswith(f"{entry.name}_") else name,
                     outcome=outcome,
                     latency_ms=latency,
-                    extra={"args": list(arguments.keys()) if arguments else []}
+                    event_type="mcp.tool.call",
+                    run_id=run_id,
+                    span_id=span_id,
+                    extra={
+                        "server": entry.name,
+                        "runtime": entry.runtime,
+                        "argument_keys": list(arguments.keys()) if arguments else [],
+                        "redacted_args": summarize_arguments(arguments),
+                    }
                 )
                 
         proxy.call_tool = audited_call
@@ -568,9 +592,19 @@ def _materialise(name: str) -> str:
     else:
         proxy_entry = entry
 
+    run_id = new_run_id()
+    span_id = new_span_id()
     ok, msg = _do_mount(proxy_entry)
     sys.stderr.write(f"[proxy] Materialised '{name}': {msg}\n")
-    audit(tool=f"{name}_load", outcome="ok" if ok else "error", latency_ms=0)
+    audit(
+        tool=f"{name}_load",
+        outcome="ok" if ok else "error",
+        latency_ms=0,
+        event_type="proxy.server.materialise",
+        run_id=run_id,
+        span_id=span_id,
+        extra={"server": name},
+    )
     return json.dumps({"ok": ok, "message": msg, "active_tool_count": _tool_count()})
 
 
@@ -800,48 +834,60 @@ def proxy_handshake(
         open_files: File paths currently open in the IDE (optional, helps infer stack)
         requirements: Package names from requirements.txt / package.json (optional)
     """
-    if _config.guardrails_enabled and not check_rate_limit("anonymous"):
+    caller = current_caller()
+    if _config.guardrails_enabled and not check_rate_limit(caller):
         return json.dumps({"ok": False, "error": "Rate limit exceeded. Try again later."})
 
+    run_id = current_run_id() or new_run_id()
+    span_id = new_span_id()
     t0 = time.monotonic()
-    context = ProjectContext(
-        tech_stack=tech_stack or [],
-        task_description=task_description,
-        open_files=open_files or [],
-        requirements=requirements or [],
-    )
+    with telemetry_span(
+        "proxy.handshake",
+        {
+            "caller.id": caller,
+            "proxy.tool_budget": _config.tool_budget,
+        },
+    ):
+        context = ProjectContext(
+            tech_stack=tech_stack or [],
+            task_description=task_description,
+            open_files=open_files or [],
+            requirements=requirements or [],
+        )
 
-    ranked = rank_servers(context, _catalogue, top_k=5, usage=dict(_server_usage))
-    activated: list[str] = []
-    skipped: list[str] = []
+        ranked = rank_servers(context, _catalogue, top_k=5, usage=dict(_server_usage))
+        activated: list[str] = []
+        skipped: list[str] = []
 
-    for r in ranked:
-        name = r.entry.name
-        # Already fully active: bump LRU order
-        if name in _active_servers:
-            with _lock:
-                _active_servers.move_to_end(name)
-            activated.append(name)
-            continue
-        # Already pending: re-use existing stub
-        if name in _pending_servers:
-            activated.append(name)
-            continue
-        # Register as deferred (creates the {name}_load stub)
-        ok, msg = _register_pending(r.entry)
-        if ok:
-            activated.append(name)
-        else:
-            skipped.append(f"{name}: {msg}")
+        for r in ranked:
+            name = r.entry.name
+            # Already fully active: bump LRU order
+            if name in _active_servers:
+                with _lock:
+                    _active_servers.move_to_end(name)
+                activated.append(name)
+                continue
+            # Already pending: re-use existing stub
+            if name in _pending_servers:
+                activated.append(name)
+                continue
+            # Register as deferred (creates the {name}_load stub)
+            ok, msg = _register_pending(r.entry)
+            if ok:
+                activated.append(name)
+            else:
+                skipped.append(f"{name}: {msg}")
 
     latency = float(round((time.monotonic() - t0) * 1000, 1))
 
-    audit(tool="proxy_handshake", outcome="ok", latency_ms=latency,
-          extra={"activated": activated})
+    audit(tool="proxy_handshake", caller=caller, outcome="ok", latency_ms=latency,
+          event_type="proxy.handshake", run_id=run_id, span_id=span_id,
+          extra={"activated": activated, "skipped": skipped})
 
     result = {
         "activated_servers": activated,
         "skipped": skipped,
+        "run_id": run_id,
         "active_tool_count": _tool_count(),
         "budget_remaining": _config.tool_budget - _tool_count(),
         "context_received": {
@@ -1158,8 +1204,11 @@ def proxy_activate_server(name: str, eager: bool = False) -> str:
     else:
         ok, msg = _register_pending(cat)
 
+    run_id = new_run_id()
+    span_id = new_span_id()
     audit(tool="proxy_activate_server", outcome="ok" if ok else "error",
           latency_ms=float(round((time.monotonic() - t0) * 1000, 1)),
+          event_type="proxy.server.activate", run_id=run_id, span_id=span_id,
           extra={"server": name, "eager": eager})
 
     result = json.dumps({"ok": ok, "message": msg, "active_tool_count": _tool_count()})
@@ -1294,6 +1343,7 @@ def _startup() -> None:
 
     init_audit_log(_config)
     init_rate_limiter(_config)
+    init_telemetry(_config)
 
     sys.stderr.write(f"[proxy] Loaded catalogue: {len(_catalogue)} servers.\n")
     sys.stderr.write(f"[proxy] Tool budget: {_config.tool_budget}.\n")

@@ -69,6 +69,13 @@ class AppConfig(BaseModel):
     catalogue_path: str = "catalogue.json"
     audit_log_path: str = "audit.log"
 
+    # Receipts / observability
+    receipts_enabled: bool = True
+    otel_enabled: bool = False
+    otel_service_name: str = "dynamic-mcp-proxy"
+    otel_exporter_otlp_endpoint: Optional[str] = None
+    otel_capture_content: bool = False
+
     # Registered proxies (persisted)
     proxies: list[ProxyEntry] = Field(default_factory=list)
 
