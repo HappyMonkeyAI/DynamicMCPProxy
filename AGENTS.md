@@ -4,6 +4,10 @@ This is the canonical agent guide and workflow protocol (HERMES equivalent).
 
 Extends the [Anti-Gravity Agents Prompt Protocol](https://github.com/SPhillips1337/AntigravityAgentsPromptProtocol).
 
+## Session start and end (Spine)
+If the `spine` MCP is available, call `session_brief(project="dynamic-mcp-proxy")` (or the absolute path of this repo) first and use `get_section` / `recall` instead of reading PROGRESS.md or CONTEXT.md whole. Without the MCP, run `spine brief` from the repo root. If neither works, ground normally.
+Before you stop, call `checkpoint` with your agent name (e.g. `hermes`), what was done, what's next and any blockers. Save durable why/gotcha/decision facts with `record_memory`.
+
 ---
 
 ## Role & Prime Directive
@@ -78,3 +82,5 @@ Never pass a `stdio://...` string directly to `create_proxy()`.
 
 Pass tests → `git add -A` → `git commit -m "fix: ..."` → continue.
 If stuck after 3 attempts → `git reset --hard HEAD` → re-read patterns_and_lessons.md → new approach.
+
+Shared protocol law: [AgentsProtocol](https://github.com/HappyMonkeyAI/AgentsProtocol).
